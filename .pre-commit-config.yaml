@@ -1,0 +1,36 @@
+minimum_pre_commit_version: '4.7.0'
+default_stages: [pre-commit]
+exclude: '^(vendor/|third_party/)'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+      - id: detect-private-key
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: Ruff lint (locked project version)
+        entry: uv run --frozen ruff check --fix
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: Ruff format (locked project version)
+        entry: uv run --frozen ruff format
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: uv-lock-check
+        name: Check dependency lock is current
+        entry: uv lock --check
+        language: system
+        files: '^(pyproject\.toml|uv\.lock)$'
+        pass_filenames: false
