@@ -11,6 +11,7 @@ The simulation, heatmap and camera modules all read the same grid:
 
 Cell (gx, gy): gx to the right, gy down. Metres: x = (gx + 0.5) * cell_m for a cell centre.
 """
+
 from __future__ import annotations
 
 import json
@@ -52,18 +53,31 @@ class Site:
 
 
 def load_site(path_or_dict) -> Site:
-    raw = path_or_dict if isinstance(path_or_dict, dict) else json.loads(Path(path_or_dict).read_text())
+    raw = (
+        path_or_dict
+        if isinstance(path_or_dict, dict)
+        else json.loads(Path(path_or_dict).read_text())
+    )
     g = raw["grid"]
     kind = np.array([[CODES[c] for c in row] for row in g["cells"]], dtype=np.uint8)
     zone = np.array(g["zone_ids"], dtype=np.int32)
     assert kind.shape == zone.shape == (g["h"], g["w"]), "grid size mismatch"
-    return Site(raw=raw, kind=kind, zone=zone, cell_m=g["cell_m"], zones=raw["zones"], doors=raw["doors"])
+    return Site(
+        raw=raw,
+        kind=kind,
+        zone=zone,
+        cell_m=g["cell_m"],
+        zones=raw["zones"],
+        doors=raw["doors"],
+    )
 
 
 if __name__ == "__main__":
     import sys
 
     s = load_site(sys.argv[1])
-    print(f"{s.raw['name']}: {s.kind.shape[1]}x{s.kind.shape[0]} cells of {s.cell_m} m, "
-          f"{len(s.zones)} zones, {len(s.doors)} doors, {len(s.exits)} exits, "
-          f"{s.walkable.sum() * s.cell_m ** 2:.0f} m2 walkable")
+    print(
+        f"{s.raw['name']}: {s.kind.shape[1]}x{s.kind.shape[0]} cells of {s.cell_m} m, "
+        f"{len(s.zones)} zones, {len(s.doors)} doors, {len(s.exits)} exits, "
+        f"{s.walkable.sum() * s.cell_m**2:.0f} m2 walkable"
+    )

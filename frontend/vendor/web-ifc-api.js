@@ -71611,7 +71611,7 @@ var Properties = class _Properties {
     this.api = api;
   }
   /**
-   * 
+   *
    * @param modelID model handle
    * @param id  expressID of IfcElement
    * @param recursive default false, if true get all nested properties recursively
@@ -71922,7 +71922,7 @@ var IfcAPI2 = class {
     }
   }
   /**
-     * Opens a set of models and returns model IDs 
+     * Opens a set of models and returns model IDs
      * @param dataSets Array of Buffers containing IFC data (bytes)
      * @param settings Settings for loading the model @see LoaderSettings
   * @returns Array of model IDs
@@ -72178,7 +72178,7 @@ var IfcAPI2 = class {
   /**
    * Gets the next unused expressID
    * @param modelID Model handle retrieved by OpenModel
-   * @param expressID Starting expressID value 
+   * @param expressID Starting expressID value
    * @returns The next unused expressID starting from the value provided
    */
   GetNextExpressID(modelID, expressID) {
@@ -72222,7 +72222,7 @@ var IfcAPI2 = class {
     return this.wasmModule.GetTypeCodeFromName(typeName);
   }
   /**
-   * Evaluates if a type is subtype of IfcElement 
+   * Evaluates if a type is subtype of IfcElement
    * @param type Type code
    * @returns True if subtype of Ifcelement, False if it is not subtype
    */
@@ -72322,7 +72322,7 @@ var IfcAPI2 = class {
    * Get all line IDs of a specific ifc type
    * @param modelID model ID
    * @param type ifc type, @see IfcEntities
-   * @param includeInherited if true, also returns all inherited types 
+   * @param includeInherited if true, also returns all inherited types
    * @returns vector of line IDs
    */
   GetLineIDsWithType(modelID, type, includeInherited = false) {
@@ -72350,7 +72350,7 @@ var IfcAPI2 = class {
     return lineIds;
   }
   /**
-   * Returns all crossSections in 2D contained in IFCSECTIONEDSOLID, IFCSECTIONEDSURFACE, IFCSECTIONEDSOLIDHORIZONTAL (IFC4x3 or superior) 
+   * Returns all crossSections in 2D contained in IFCSECTIONEDSOLID, IFCSECTIONEDSURFACE, IFCSECTIONEDSOLIDHORIZONTAL (IFC4x3 or superior)
    * @param modelID model ID
    * @returns Lists with the cross sections curves as sets of points
    */
@@ -72379,7 +72379,7 @@ var IfcAPI2 = class {
     return crossSectionList;
   }
   /**
-   * Returns all crossSections in 3D contained in IFCSECTIONEDSOLID, IFCSECTIONEDSURFACE, IFCSECTIONEDSOLIDHORIZONTAL (IFC4x3 or superior) 
+   * Returns all crossSections in 3D contained in IFCSECTIONEDSOLID, IFCSECTIONEDSURFACE, IFCSECTIONEDSOLIDHORIZONTAL (IFC4x3 or superior)
    * @param modelID model ID
    * @returns Lists with the cross sections curves as sets of points
    */
@@ -72527,7 +72527,7 @@ var IfcAPI2 = class {
   /**
    * Set the transformation matrix
    * @param modelID model ID
-   * @param transformationMatrix transformation matrix, flat 4x4 matrix as array[16] 
+   * @param transformationMatrix transformation matrix, flat 4x4 matrix as array[16]
    */
   SetGeometryTransformation(modelID, transformationMatrix) {
     if (transformationMatrix.length != 16) {
@@ -72711,7 +72711,7 @@ var IfcAPI2 = class {
   /**
    * Encodes test using IFC Encoding
    * @text the text to encode
-   * @returns the text encoded 
+   * @returns the text encoded
    */
   EncodeText(text) {
     return this.wasmModule.EncodeText(text);
@@ -72719,7 +72719,7 @@ var IfcAPI2 = class {
   /**
   * Decodes test using IFC Encoding
   * @text the text to decode
-  * @returns the text decoded 
+  * @returns the text decoded
   */
   DecodeText(text) {
     return this.wasmModule.DecodeText(text);
