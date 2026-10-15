@@ -1,0 +1,342 @@
+{
+ "_note": "Blind test: public plans never used while developing the reader. Same format as real_plans.json. The reader was not changed after seeing them.",
+ "plans": [
+  {
+   "id": "uk_flat_red",
+   "url": "https://raw.githubusercontent.com/zlzeng/DeepFloorplan/master/demo/45719584.jpg",
+   "source": "DeepFloorplan demo image (GPL-3.0 repo, downloaded at run time)",
+   "printed_as": "m and ft, dark red walls",
+   "rooms": [
+    {
+     "name": "Dining room",
+     "x": 80,
+     "y": 95,
+     "area": 6.38
+    },
+    {
+     "name": "Reception room",
+     "x": 195,
+     "y": 145,
+     "area": 18.04
+    },
+    {
+     "name": "Kitchen",
+     "x": 80,
+     "y": 175,
+     "area": 5.69
+    },
+    {
+     "name": null,
+     "x": 205,
+     "y": 262,
+     "what": "Bathroom"
+    },
+    {
+     "name": null,
+     "x": 200,
+     "y": 322,
+     "what": "Shower room"
+    },
+    {
+     "name": "Bedroom 2",
+     "x": 85,
+     "y": 420,
+     "area": 11.16
+    },
+    {
+     "name": "Master bedroom",
+     "x": 195,
+     "y": 425,
+     "area": 14.33
+    }
+   ]
+  },
+  {
+   "id": "uk_flat_2nd",
+   "url": "https://raw.githubusercontent.com/zlzeng/DeepFloorplan/master/demo/45765448.jpg",
+   "source": "DeepFloorplan demo image",
+   "printed_as": "m and ft, bathroom labels outside the building",
+   "rooms": [
+    {
+     "name": "Bedroom",
+     "x": 150,
+     "y": 140,
+     "area": 17.96
+    },
+    {
+     "name": "Kitchen",
+     "x": 255,
+     "y": 150,
+     "area": 9.36
+    },
+    {
+     "name": "Bedroom",
+     "x": 350,
+     "y": 200,
+     "area": 9.48
+    },
+    {
+     "name": "Bathroom",
+     "x": 85,
+     "y": 222,
+     "area": 6.13
+    },
+    {
+     "name": "Bathroom",
+     "x": 148,
+     "y": 250,
+     "area": 3.98
+    },
+    {
+     "name": "Reception room",
+     "x": 165,
+     "y": 360,
+     "area": 36.02
+    },
+    {
+     "name": "Bedroom",
+     "x": 360,
+     "y": 360,
+     "area": 16.49
+    },
+    {
+     "name": "Bathroom",
+     "x": 440,
+     "y": 375,
+     "area": 6.13
+    }
+   ]
+  },
+  {
+   "id": "uk_flat_4th",
+   "url": "https://raw.githubusercontent.com/zlzeng/DeepFloorplan/master/demo/47541863.jpg",
+   "source": "DeepFloorplan demo image",
+   "printed_as": "m and ft",
+   "rooms": [
+    {
+     "name": "Bedroom",
+     "x": 85,
+     "y": 240,
+     "area": 14.72
+    },
+    {
+     "name": "Bedroom",
+     "x": 175,
+     "y": 215,
+     "area": 9.36
+    },
+    {
+     "name": "Reception room",
+     "x": 275,
+     "y": 250,
+     "area": 22.38
+    },
+    {
+     "name": null,
+     "x": 175,
+     "y": 345,
+     "what": "Hall (size only)",
+     "area": 10.66
+    },
+    {
+     "name": "Bedroom",
+     "x": 265,
+     "y": 360,
+     "area": 12.44
+    },
+    {
+     "name": "Kitchen",
+     "x": 85,
+     "y": 390,
+     "area": 8.02
+    },
+    {
+     "name": null,
+     "x": 68,
+     "y": 310,
+     "what": "WC"
+    },
+    {
+     "name": null,
+     "x": 105,
+     "y": 440,
+     "what": "Bathroom"
+    }
+   ]
+  },
+  {
+   "id": "au_house_grey",
+   "url": "https://raw.githubusercontent.com/grebtsew/FloorplanToBlender3d/master/Images/Examples/example3.png",
+   "source": "FloorplanToBlender3d example (GPL-3.0, downloaded at run time)",
+   "printed_as": "small grey lower-case names, furniture, tiled floors, no sizes",
+   "rooms": [
+    {
+     "name": "Activity",
+     "x": 305,
+     "y": 250
+    },
+    {
+     "name": "Family/living",
+     "x": 405,
+     "y": 200
+    },
+    {
+     "name": "Dining",
+     "x": 405,
+     "y": 282
+    },
+    {
+     "name": "Gourmet kitchen",
+     "x": 505,
+     "y": 250
+    },
+    {
+     "name": "Master suite",
+     "x": 610,
+     "y": 355
+    },
+    {
+     "name": "Study nook",
+     "x": 530,
+     "y": 375
+    },
+    {
+     "name": "Entry",
+     "x": 490,
+     "y": 375
+    },
+    {
+     "name": "Home theatre",
+     "x": 405,
+     "y": 378
+    },
+    {
+     "name": "Bed 2",
+     "x": 322,
+     "y": 380
+    },
+    {
+     "name": "Bed 3",
+     "x": 255,
+     "y": 380
+    },
+    {
+     "name": "Bed 4",
+     "x": 182,
+     "y": 380
+    },
+    {
+     "name": "Double garage",
+     "x": 75,
+     "y": 330
+    }
+   ]
+  },
+  {
+   "id": "uk_terrace",
+   "url": "https://raw.githubusercontent.com/grebtsew/FloorplanToBlender3d/master/Images/Examples/example5.png",
+   "source": "FloorplanToBlender3d example",
+   "printed_as": "large names, no sizes",
+   "rooms": [
+    {
+     "name": "Shower",
+     "x": 227,
+     "y": 174
+    },
+    {
+     "name": "Kitchen",
+     "x": 184,
+     "y": 307
+    },
+    {
+     "name": "Lounge",
+     "x": 235,
+     "y": 573
+    },
+    {
+     "name": "Bedroom 2",
+     "x": 440,
+     "y": 573
+    },
+    {
+     "name": null,
+     "x": 404,
+     "y": 757,
+     "what": "Landing (label sideways)"
+    },
+    {
+     "name": "Bedroom 1",
+     "x": 225,
+     "y": 901
+    },
+    {
+     "name": "Bedroom 3",
+     "x": 440,
+     "y": 921
+    }
+   ]
+  },
+  {
+   "id": "jp_flat",
+   "url": "https://raw.githubusercontent.com/art-programmer/FloorplanTransformation/master/annatator/data/floorplan_1.png",
+   "source": "FloorplanTransformation annotator sample",
+   "printed_as": "Japanese names, colour-filled rooms",
+   "rooms": [
+    {
+     "name": null,
+     "x": 60,
+     "y": 140,
+     "what": "Bedroom"
+    },
+    {
+     "name": "WIC",
+     "x": 195,
+     "y": 140
+    },
+    {
+     "name": null,
+     "x": 360,
+     "y": 145,
+     "what": "Bedroom"
+    },
+    {
+     "name": null,
+     "x": 70,
+     "y": 250,
+     "what": "Living"
+    },
+    {
+     "name": null,
+     "x": 285,
+     "y": 233,
+     "what": "Hall"
+    },
+    {
+     "name": null,
+     "x": 275,
+     "y": 262,
+     "what": "Toilet"
+    },
+    {
+     "name": null,
+     "x": 277,
+     "y": 312,
+     "what": "Bath"
+    },
+    {
+     "name": null,
+     "x": 332,
+     "y": 282,
+     "what": "Washroom"
+    },
+    {
+     "name": null,
+     "x": 386,
+     "y": 252,
+     "what": "Entrance"
+    }
+   ],
+   "_points": "points moved off the Japanese labels after the first run (the labels themselves are read as walls)"
+  }
+ ]
+}

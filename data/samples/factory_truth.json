@@ -1,0 +1,217 @@
+{
+ "origin": "outer face of the north-west corner is (-0.15, -0.15)",
+ "rooms": [
+  {
+   "name": "Office A",
+   "type": "office",
+   "net_area_m2": 46.68,
+   "centre": [
+    2.5,
+    5.0
+   ]
+  },
+  {
+   "name": "Office B",
+   "type": "office",
+   "net_area_m2": 47.41,
+   "centre": [
+    7.5,
+    5.0
+   ]
+  },
+  {
+   "name": "Corridor",
+   "type": "corridor",
+   "net_area_m2": 18.08,
+   "centre": [
+    5.0,
+    11.0
+   ]
+  },
+  {
+   "name": "Lockers",
+   "type": "welfare",
+   "net_area_m2": 56.23,
+   "centre": [
+    2.5,
+    18.0
+   ]
+  },
+  {
+   "name": "Canteen",
+   "type": "welfare",
+   "net_area_m2": 57.11,
+   "centre": [
+    7.5,
+    18.0
+   ]
+  },
+  {
+   "name": "Storage",
+   "type": "storage",
+   "net_area_m2": 86.43,
+   "centre": [
+    29.0,
+    4.5
+   ]
+  },
+  {
+   "name": "Loading bay",
+   "type": "loading_bay",
+   "net_area_m2": 50.68,
+   "centre": [
+    37.0,
+    4.5
+   ]
+  },
+  {
+   "name": "Production hall",
+   "type": "production",
+   "net_area_m2": 563.54,
+   "centre": [
+    20,
+    13
+   ]
+  }
+ ],
+ "doors": [
+  {
+   "centre": [
+    37.0,
+    0
+   ],
+   "width_m": 4.0,
+   "swing_side": null,
+   "hinge": null
+  },
+  {
+   "centre": [
+    4.5,
+    24
+   ],
+   "width_m": 1.0,
+   "swing_side": -1,
+   "hinge": [
+    5.0,
+    24
+   ]
+  },
+  {
+   "centre": [
+    40,
+    14.5
+   ],
+   "width_m": 1.0,
+   "swing_side": 1,
+   "hinge": [
+    40,
+    14
+   ]
+  },
+  {
+   "centre": [
+    10,
+    5.45
+   ],
+   "width_m": 0.9,
+   "swing_side": 1,
+   "hinge": [
+    10,
+    5
+   ]
+  },
+  {
+   "centre": [
+    10,
+    16.6
+   ],
+   "width_m": 1.2,
+   "swing_side": 1,
+   "hinge": [
+    10,
+    16
+   ]
+  },
+  {
+   "centre": [
+    6.45,
+    10
+   ],
+   "width_m": 0.9,
+   "swing_side": -1,
+   "hinge": [
+    6,
+    10
+   ]
+  },
+  {
+   "centre": [
+    2.45,
+    12
+   ],
+   "width_m": 0.9,
+   "swing_side": -1,
+   "hinge": [
+    2,
+    12
+   ]
+  },
+  {
+   "centre": [
+    7.45,
+    12
+   ],
+   "width_m": 0.9,
+   "swing_side": -1,
+   "hinge": [
+    7,
+    12
+   ]
+  },
+  {
+   "centre": [
+    5,
+    4.45
+   ],
+   "width_m": 0.9,
+   "swing_side": 1,
+   "hinge": [
+    5,
+    4
+   ]
+  },
+  {
+   "centre": [
+    24,
+    6.6
+   ],
+   "width_m": 1.2,
+   "swing_side": 1,
+   "hinge": [
+    24,
+    6
+   ]
+  },
+  {
+   "centre": [
+    28.5,
+    9
+   ],
+   "width_m": 3.0,
+   "swing_side": null,
+   "hinge": null
+  },
+  {
+   "centre": [
+    34,
+    4.5
+   ],
+   "width_m": 1.0,
+   "swing_side": 1,
+   "hinge": [
+    34,
+    4
+   ]
+  }
+ ]
+}

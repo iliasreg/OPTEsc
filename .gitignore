@@ -1,3 +1,4 @@
+node_modules/
 .venv/
 __pycache__/
 *.py[cod]
@@ -15,3 +16,7 @@ dist/
 !.env.example
 .DS_Store
 Thumbs.db
+__pycache__/
+*.pyc
+/eval/out/
+/cubicasa_cache/

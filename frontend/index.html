@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPTEsc Plan to 3D</title>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --text: #1d232b; --muted: #5a6470; --line: #dfe3e8;
+    --accent: #2f6fe0; --accent-ink: #ffffff; --chip: #eef1f5; --danger: #c0392b; --sel: #e7efff; --crit: #d64545; --warn: #c98a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161b; --panel: #1a2027; --text: #e7ebef; --muted: #9aa5b1; --line: #2b333c;
+      --accent: #6c9cff; --accent-ink: #0d1117; --chip: #242c35; --danger: #ff7b6b; --sel: #22314d; --crit: #ff6b6b; --warn: #e8b04a; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161b; --panel: #1a2027; --text: #e7ebef; --muted: #9aa5b1; --line: #2b333c;
+    --accent: #6c9cff; --accent-ink: #0d1117; --chip: #242c35; --danger: #ff7b6b; --sel: #22314d; --crit: #ff6b6b; --warn: #e8b04a; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif;
+         display: grid; grid-template-columns: 320px 1fr; grid-template-rows: 100%; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  h1 { font-size: 17px; margin: 0; } h1 span { color: var(--muted); font-weight: 500; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  button, .btn { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--text); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button:hover, .btn:hover { border-color: var(--accent); }
+  .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  [aria-pressed="true"], [aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  label.f { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--muted); }
+  input[type=number], input[type=text], select, li input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; width: 100%; }
+  details summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
+  #status { color: var(--muted); font-size: 13px; min-height: 18px; } #status.err { color: var(--danger); }
+  #stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  #stats div { background: var(--chip); border-radius: 8px; padding: 6px; text-align: center; }
+  #stats b { display: block; font-size: 16px; } #stats span { color: var(--muted); font-size: 11px; }
+  #zones { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  #zones li { display: grid; grid-template-columns: 12px 1fr 104px; grid-template-rows: auto auto; gap: 2px 8px; align-items: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; }
+  #zones li.sel { background: var(--sel); border-color: var(--accent); }
+  #zones .sw { width: 12px; height: 12px; border-radius: 3px; grid-row: span 2; }
+  #zones small { color: var(--muted); grid-column: 2 / span 2; }
+  #main { position: relative; min-width: 0; display: flex; flex-direction: column; }
+  #main.drag::after { content: 'Drop a floor plan image or site JSON'; position: absolute; inset: 12px; border: 3px dashed var(--accent); border-radius: 16px; display: grid; place-items: center; font-size: 20px; background: color-mix(in srgb, var(--bg) 80%, transparent); z-index: 5; }
+  .bar { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; align-items: center; }
+  .bar .sep { flex: 1; }
+  .bar label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+  .pane { flex: 1; position: relative; min-height: 0; }
+  #view3d, #edit-wrap { position: absolute; inset: 0; }
+  body[data-tab="3d"] #edit-wrap, body[data-tab="3d"] .edit-only, body[data-tab="edit"] #view3d, body[data-tab="edit"] .view-only { display: none !important; }
+  #edit-canvas { touch-action: none; cursor: crosshair; display: block; }
+  .hint { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); background: rgba(20,24,30,.82); color: #fff; padding: 8px 14px; border-radius: 10px; font-size: 13px; pointer-events: none; white-space: nowrap; }
+  #walk-hint { display: none; } body[data-mode="walk"] #walk-hint { display: block; } body[data-mode="walk"] #orbit-hint { display: none; }
+  #view3d.locked ~ #walk-hint { display: none !important; }
+  #crosshair { display: none; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); pointer-events: none; }
+  #view3d.locked #crosshair { display: block; }
+  #empty { color: var(--muted); }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  #stats div:last-child b { font-size: 15px; }
+  #issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+  #issues li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; font-size: 13px; }
+  #issues li:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #issues li.sel { border-color: var(--accent); background: var(--sel); }
+  #issues .sev { position: relative; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 11px; color: #fff; }
+  #issues .sev em { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  #issues .critical .sev { background: var(--crit); } #issues .warning .sev { background: var(--warn); } #issues .info .sev { background: var(--muted); }
+  #issue-count { color: var(--muted); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+  #scale-note { color: var(--muted); font-size: 12px; margin: 0 0 6px; }
+  #dist-legend { position: absolute; left: 12px; top: 12px; display: flex; align-items: center; gap: 2px; background: var(--panel); color: var(--muted); font-size: 12px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); }
+  #dist-legend i { width: 14px; height: 10px; display: inline-block; }
+  #dist-legend span { margin: 0 4px; }
+  input:disabled { opacity: .6; }
+  #zones .mini { grid-column: 2 / span 2; justify-self: start; font-size: 12px; padding: 3px 8px; }
+  #dist-legend[hidden] { display: none; }
+  #sim-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 8px; }
+  #sim-stats div { background: var(--chip); border-radius: 8px; padding: 6px 8px; }
+  #sim-stats b { display: block; font-size: 16px; } #sim-stats span { color: var(--muted); font-size: 11px; }
+  #sim-stats .bad b { color: var(--crit); }
+  .simlist { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  .simlist li { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .simlist li small { grid-column: 1 / span 2; color: var(--muted); }
+  .simlist li.bad { border-color: var(--crit); } .simlist li.warn { border-color: var(--warn); }
+  .simlist li[data-fire] { cursor: pointer; } .simlist li[data-fire]:hover { border-color: var(--accent); }
+  .tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px; color: #fff; align-self: start; }
+  .tag.bad { background: var(--crit); } .tag.warn { background: var(--warn); } .tag.ok { background: #2f9e5b; }
+  #sim-h3 { font-size: 12px; color: var(--muted); margin: 10px 0 0; font-weight: 600; }
+  #player { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; z-index: 3; }
+  #player[hidden] { display: none; }
+  #player input[type=range] { flex: 1; min-width: 60px; }
+  #player .clock { font-variant-numeric: tabular-nums; min-width: 52px; font-weight: 600; }
+  #player .counts { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  #player .counts i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; vertical-align: -1px; }
+  body:has(#player:not([hidden])) .hint { bottom: 70px; }
+  @media (max-width: 800px) { #player { flex-wrap: wrap; } #player .counts { width: 100%; } }
+  @media (max-width: 800px) {
+    body { grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
+    aside { order: 2; border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
+    #main { order: 1; }
+    .hint { white-space: normal; width: calc(100% - 32px); text-align: center; }
+  }
+</style>
+</head>
+<body data-tab="3d" data-mode="orbit">
+<aside>
+  <div>
+    <h1>OPTEsc <span>Plan to 3D</span></h1>
+    <p style="margin:6px 0 0;color:var(--muted)">Upload a DXF, PDF or image plan. Walls, doors, exits and rooms are measured, checked and built in 3D.</p>
+  </div>
+  <div class="row">
+    <label class="btn primary">Upload plan<input id="file" type="file" accept="image/*,.dxf,.pdf,.json,.ifc" hidden></label>
+    <select id="sample" aria-label="Load a sample" style="width:auto"><option value="dxf">Sample: DXF</option><option value="pdf">Sample: PDF</option><option value="png">Sample: image</option></select>
+  </div>
+  <div class="row">
+    <button id="export">Site JSON</button>
+    <button id="export-ifc">Export IFC</button>
+    <button id="check-ifc" title="Re-open the IFC export with web-ifc, an independent IFC reader">Open export in web-ifc</button>
+  </div>
+  <div id="status"></div>
+  <section>
+    <h2>Scale</h2>
+    <p id="scale-note"></p>
+    <label class="f">Building width (m)<input id="p-width" type="number" step="0.1" min="1" value="40"></label>
+    <details>
+      <summary>Detection settings</summary>
+      <label class="f">Grid cell (m)<input id="p-cell" type="number" step="0.05" min="0.05" value="0.25"></label>
+      <label class="f">Max door width (m)<input id="p-door" type="number" step="0.1" min="0.3" value="1.2"></label>
+      <label class="f">Max travel to exit (m)<input id="p-travel" type="number" step="1" min="5" value="45"></label>
+      <label class="f">Ignore lines under (px)<input id="p-filter" type="number" step="1" min="1" placeholder="auto"></label>
+      <label class="f" id="ai-row" hidden><span>Walls from the AI wall finder <small id="ai-device"></small></span><input id="p-ai" type="checkbox" checked></label>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:12px">Lower the line filter if thin inner walls are missing. Raise it if text or furniture turns into walls.</p>
+    </details>
+  </section>
+  <section><div id="stats"></div></section>
+  <section id="sim">
+    <h2>Fire drill</h2>
+    <label class="f">Fire starts in<select id="sim-fire"></select></label>
+    <label class="f">Fire spreads<select id="sim-speed"><option value="0.02">Slowly</option><option value="0.05" selected>Normally</option><option value="0.1">Fast</option></select></label>
+    <label class="f">People<input id="sim-people" type="number" min="0" step="1" placeholder="auto"></label>
+    <div class="row">
+      <button id="sim-run" class="primary">Run fire drill</button>
+      <button id="sim-pick" aria-pressed="false" title="Click a spot in the 3D view to start the fire there">Pick spot</button>
+      <button id="sim-worst" title="Start a fire in every room and rank them">Find worst fire</button>
+    </div>
+    <div id="sim-out"></div>
+  </section>
+  <section>
+    <h2>Check these <span id="issue-count"></span></h2>
+    <ul id="issues"></ul>
+  </section>
+  <section>
+    <h2>Zones</h2>
+    <p id="empty">No plan loaded yet.</p>
+    <ul id="zones"></ul>
+  </section>
+  <div class="legend">
+    <span><i style="background:#3b4048"></i>Wall</span><span><i style="background:#f2a541"></i>Door</span><span><i style="background:#2fbf71"></i>Exit</span><span><i style="background:#7cc4e8"></i>Window</span>
+  </div>
+</aside>
+<div id="main">
+  <div class="bar">
+    <button data-tabbtn="3d" aria-selected="true">3D view</button>
+    <button data-tabbtn="edit" aria-selected="false">Fix plan</button>
+    <span class="sep"></span>
+    <span class="view-only row">
+      <button data-mode="orbit" aria-pressed="true">Orbit</button>
+      <button data-mode="walk" aria-pressed="false">Walk inside</button>
+      <label><input id="t-labels" type="checkbox" checked>Labels</label>
+      <select id="color-mode" aria-label="Floor colour" style="width:auto"><option value="zones">Colour: rooms</option><option value="distance">Colour: distance to exit</option></select>
+      <label><input id="t-overlay" type="checkbox">Plan on floor</label>
+      <label>Walls <input id="p-height" type="range" min="0.5" max="6" step="0.1" value="2.6" style="width:80px"></label>
+    </span>
+    <span class="edit-only row">
+      <button data-tool="WALL" aria-pressed="true">Wall</button>
+      <button data-tool="FLOOR" aria-pressed="false">Erase</button>
+      <button data-tool="DOOR" aria-pressed="false">Door</button>
+      <select id="brush" aria-label="Brush size" style="width:auto"><option value="1">1 cell</option><option value="2">3 cells</option><option value="3">5 cells</option></select>
+      <button id="undo">Undo</button>
+      <button id="clear">Reset edits</button>
+    </span>
+  </div>
+  <div class="pane">
+    <div id="view3d"><div id="crosshair"></div></div>
+    <div id="dist-legend" class="view-only" hidden></div>
+    <div id="player" class="view-only" hidden>
+      <button id="pl-play" aria-label="Play">▶</button>
+      <span class="clock" id="pl-clock">0:00</span>
+      <input id="pl-time" type="range" min="0" max="100" step="0.1" value="0" aria-label="Time">
+      <select id="pl-rate" aria-label="Playback speed" style="width:auto"><option value="1">1×</option><option value="5" selected>5×</option><option value="15">15×</option></select>
+      <span class="counts" id="pl-counts"></span>
+      <button id="pl-close" aria-label="Close the fire drill">✕</button>
+    </div>
+    <div class="hint view-only" id="orbit-hint">Drag to rotate, right-drag to pan, scroll to zoom. Click a zone to select it.</div>
+    <div class="hint view-only" id="walk-hint">Click the view to walk. WASD or arrows to move, Shift to run, Esc to release the mouse.</div>
+    <div id="edit-wrap"><canvas id="edit-canvas"></canvas>
+      <div class="hint">Paint walls, erase false walls, or paint a door across a wide opening to split two zones.</div>
+    </div>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

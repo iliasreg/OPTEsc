@@ -1,0 +1,308 @@
+{
+ "_note": "Real floor plans. Each one is opened the way a user would: no scale and no hints, so room names, sizes and the scale all come from the plan itself. 'rooms' is the hand-made truth: a point inside each room, the name the reader should find (null when the name can't be read: sideways or non-Latin text), and the area printed on the plan (m², converted from feet or cm). 'area_covers' lists rooms an open-plan printed area also includes.",
+ "plans": [
+  {
+   "id": "user_house",
+   "file": "/mnt/project-files/uploads/hearth/728cc96b-3c4c-425a-bad6-e31b3ad4e936",
+   "source": "plan shared by the project owner (not stored in the repo)",
+   "printed_as": "room names only, no sizes",
+   "rooms": [
+    {
+     "name": "Family room",
+     "x": 383,
+     "y": 680
+    },
+    {
+     "name": "Kitchen",
+     "x": 383,
+     "y": 1064
+    },
+    {
+     "name": "Dining room",
+     "x": 964,
+     "y": 867
+    },
+    {
+     "name": "Office / library",
+     "x": 1487,
+     "y": 1001
+    },
+    {
+     "name": "Pantry",
+     "x": 256,
+     "y": 1493
+    },
+    {
+     "name": "Mud room",
+     "x": 601,
+     "y": 1493
+    },
+    {
+     "name": "Entry",
+     "x": 1026,
+     "y": 1493
+    },
+    {
+     "name": "Garage",
+     "x": 1486,
+     "y": 1502
+    },
+    {
+     "name": null,
+     "what": "WC",
+     "x": 837,
+     "y": 1558
+    }
+   ]
+  },
+  {
+   "id": "user_matterport",
+   "file": "/mnt/project-files/uploads/hearth/6161e44c-8e75-4ca1-b3c4-711838d0346d",
+   "source": "plan shared by the project owner (Matterport export, not stored in the repo)",
+   "printed_as": "room sizes in feet and inches",
+   "rooms": [
+    {
+     "name": "Kitchen",
+     "x": 593,
+     "y": 76,
+     "area": 33.42
+    },
+    {
+     "name": "Living room",
+     "x": 359,
+     "y": 104,
+     "area": 27.68
+    },
+    {
+     "name": "Bedroom",
+     "x": 168,
+     "y": 128,
+     "area": 11.33
+    },
+    {
+     "name": "Hall",
+     "x": 222,
+     "y": 207,
+     "area": 2.76
+    },
+    {
+     "name": null,
+     "what": "Bath (label printed sideways)",
+     "x": 148,
+     "y": 238,
+     "area": 5.02
+    },
+    {
+     "name": "Room",
+     "x": 642,
+     "y": 218,
+     "area": 5.54
+    },
+    {
+     "name": "Entryway",
+     "x": 314,
+     "y": 298,
+     "area": 13.91
+    },
+    {
+     "name": "Den",
+     "x": 193,
+     "y": 328,
+     "area": 22.19
+    },
+    {
+     "name": "Formal dining",
+     "x": 426,
+     "y": 339,
+     "area": 17.07
+    },
+    {
+     "name": "Office",
+     "x": 525,
+     "y": 343,
+     "area": 5.53
+    }
+   ]
+  },
+  {
+   "id": "swedish_apartment",
+   "url": "https://raw.githubusercontent.com/grebtsew/FloorplanToBlender3d/master/Images/Examples/example.png",
+   "source": "FloorplanToBlender3d example (GPL-3.0, downloaded at run time)",
+   "printed_as": "m² on the plan",
+   "rooms": [
+    {
+     "name": "Sovrum",
+     "x": 352,
+     "y": 180,
+     "area": 13
+    },
+    {
+     "name": "Klk",
+     "x": 603,
+     "y": 180,
+     "area": 3
+    },
+    {
+     "name": null,
+     "what": "Badrum/tvätt",
+     "x": 755,
+     "y": 185,
+     "area": 6
+    },
+    {
+     "name": "Vardagsrum",
+     "x": 418,
+     "y": 370,
+     "area": 41,
+     "area_covers": [
+      "Matplats",
+      "Kok"
+     ]
+    },
+    {
+     "name": "Entre",
+     "x": 1011,
+     "y": 279
+    },
+    {
+     "name": "Matplats",
+     "x": 655,
+     "y": 454
+    },
+    {
+     "name": "Kok",
+     "x": 891,
+     "y": 457
+    }
+   ]
+  },
+  {
+   "id": "us_apartment",
+   "url": "https://raw.githubusercontent.com/grebtsew/FloorplanToBlender3d/master/Images/Examples/example4.png",
+   "source": "FloorplanToBlender3d example (GPL-3.0, downloaded at run time)",
+   "printed_as": "room sizes in feet and inches",
+   "rooms": [
+    {
+     "name": "Bedroom",
+     "x": 199,
+     "y": 95,
+     "area": 10.38
+    },
+    {
+     "name": "Bedroom",
+     "x": 447,
+     "y": 95,
+     "area": 13.9
+    },
+    {
+     "name": "Terrace",
+     "x": 198,
+     "y": 198
+    },
+    {
+     "name": "Kitchen",
+     "x": 200,
+     "y": 316,
+     "area": 9.99
+    },
+    {
+     "name": "Foyer",
+     "x": 335,
+     "y": 316,
+     "area": 14.56
+    },
+    {
+     "name": "Living room",
+     "x": 447,
+     "y": 282,
+     "area": 16.77
+    }
+   ]
+  },
+  {
+   "id": "israeli_apartment",
+   "url": "https://raw.githubusercontent.com/grebtsew/FloorplanToBlender3d/master/Images/Examples/example2.png",
+   "source": "FloorplanToBlender3d example (GPL-3.0, downloaded at run time)",
+   "printed_as": "Hebrew names, sizes in cm",
+   "rooms": [
+    {
+     "name": null,
+     "what": "Parents' bedroom",
+     "x": 190,
+     "y": 110,
+     "area": 11.17
+    },
+    {
+     "name": null,
+     "what": "Parents' bath",
+     "x": 305,
+     "y": 115,
+     "area": 3.59
+    },
+    {
+     "name": null,
+     "what": "Bedroom 2",
+     "x": 190,
+     "y": 305,
+     "area": 9.13
+    },
+    {
+     "name": null,
+     "what": "Kitchen",
+     "x": 395,
+     "y": 265,
+     "area": 8.81
+    },
+    {
+     "name": null,
+     "what": "Living",
+     "x": 585,
+     "y": 315,
+     "area": 20.58
+    },
+    {
+     "name": null,
+     "what": "Bedroom 3",
+     "x": 760,
+     "y": 360,
+     "area": 9.26
+    },
+    {
+     "name": null,
+     "what": "Bath",
+     "x": 205,
+     "y": 425,
+     "area": 5.64
+    },
+    {
+     "name": null,
+     "what": "Guest WC",
+     "x": 365,
+     "y": 460,
+     "area": 1.57
+    },
+    {
+     "name": null,
+     "what": "Dining",
+     "x": 465,
+     "y": 465,
+     "area": 11.69
+    },
+    {
+     "name": null,
+     "what": "Safe room",
+     "x": 280,
+     "y": 580,
+     "area": 9.31
+    },
+    {
+     "name": null,
+     "what": "Bedroom 4",
+     "x": 460,
+     "y": 640,
+     "area": 11.11
+    }
+   ]
+  }
+ ]
+}
