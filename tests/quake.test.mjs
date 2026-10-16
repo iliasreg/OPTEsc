@@ -97,8 +97,34 @@ test('nobody who cannot climb rubble walks onto it; nobody walks through a jamme
       });
     }
     const m = r.metrics;
-    assert.equal(m.out + m.injured + m.trapped + m.overcome + m.assist, 40);
+    assert.equal(m.out + m.injured + m.killed + m.trapped + m.overcome + m.assist, 40);
   }
+});
+
+test('whoever is under a wall when it lands is hit; severity 4 is dead, not injured', () => {
+  const site = twoRooms(), dt = 0.1;
+  let hits = 0, killed = 0;
+  for (let seed = 1; seed <= 12; seed++) {
+    const r = simulate(site, { scenario: 'earthquake', quakeLevel: 'severe', building: 'URML', design: 'pre', seed, total: 60, dt, frameEvery: dt });
+    const g = site.grid, c = g.cell_m, { times, pos, state } = r.frames;
+    const cell = (P, k) => Math.floor(P[2 * k + 1] / c) * g.w + Math.floor(P[2 * k] / c);
+    for (const ev of r.quake.events.filter((e) => e.type === 'wall')) {
+      const cells = new Set(ev.cells);
+      // the frame before the step that handles the impact (1 s after the wall starts to fall)
+      const f = times.findIndex((t) => t >= ev.t + 1 - 1e-6) - 1;
+      if (f < 0) continue;
+      r.people.forEach((p, k) => {
+        if (![STATE.WAITING, STATE.MOVING, STATE.ASSIST].includes(state[f][k]) || !cells.has(cell(pos[f], k))) return;
+        hits++;
+        assert.ok(p.severity > 0, `seed ${seed}: person ${k} under wall ${ev.id} unhurt`);
+      });
+    }
+    r.people.forEach((p) => {
+      if (p.state === STATE.KILLED) { killed++; assert.equal(p.severity, 4); }
+      if (p.state === STATE.INJURED) assert.ok(p.severity === 2 || p.severity === 3);
+    });
+  }
+  assert.ok(hits > 0 && killed > 0, `hits ${hits}, killed ${killed}`);
 });
 
 test('damage states come out as often as the HAZUS fragility curves say', () => {

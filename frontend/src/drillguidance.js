@@ -146,7 +146,7 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
     lastTime = t;
     const next = eventAt(events, t);
     if (next !== event) { invalidate(); event = next; render(); modelRequest(); }
-    const text = counts ? `SIMULATED whole building: ${counts.out} out; ${counts.overcome} overcome; ${counts.trapped} trapped${counts.injured ? `; ${counts.injured} injured` : ''}. Not room-level readings.` : '';
+    const text = counts ? `In the simulation now: ${counts.out} out, ${counts.overcome} overcome, ${counts.trapped} trapped${counts.injured ? `, ${counts.injured} hurt` : ''}${counts.killed ? `, ${counts.killed} dead` : ''}.` : '';
     if ($('rag-simulated').textContent !== text) $('rag-simulated').textContent = text;
   }
   function stop() {

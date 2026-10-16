@@ -65,6 +65,10 @@ full dose (FED 1, the median) or in a flashover.
 | Radiant heat from the flames | painful past 2.5 kW/m² (point source); people go round it where they can | |
 | Route choice | familiar occupants take the nearest exit. In unfamiliar buildings without a voice alarm, half head for the main entrance (widest exit) until blocked or smoked out | C/VM2 3.2.7 |
 
+The replay sounds the evacuation alarm in the ISO 8201 "temporal-three" pattern from the moment
+people are warned (a chime and a spoken message for a voice alarm), so the delay between the alarm
+and people setting off is visible and audible. A yellow mark shows each person as they set off.
+
 ## 4. Safety check (many runs)
 
 `assess()` runs the same emergency 20 times with different people: where they stand, their speed,
@@ -89,8 +93,14 @@ The building damage state comes from the HAZUS Earthquake Model Technical Manual
 - **Collapse:** the probability of collapse given Complete damage comes from Table 12-8.
 - **Casualties:** indoor casualty rates by severity 1–4 come from Tables 12-3 to 12-7. The totals per
   run are those of HAZUS.
-- **Who is hurt (assumption):** people are picked by relative exposure. Under falling rubble the
-  weight is 5×, sheltering under a table 0.3×, moving during the shaking 2×.
+- **Direct hits (assumption):** anyone still inside where a wall panel or a tall piece of furniture
+  lands is hit at the moment it reaches the floor (1 s after a wall starts to fall, 0.8 s for
+  furniture), wherever they have walked to by then. Severity 1–4 is drawn from assumed shares:
+  falling wall 20/30/25/25%, toppling furniture 55/30/10/5%, under a sturdy table 60/30/8/2%.
+  Severity 4 is shown as dead, 2 and 3 as too hurt to walk, 1 as slowed down.
+- **Everyone else (assumption):** the rest of the HAZUS count, less the hits expected where people
+  stand at the start, is spread by relative exposure: sheltering under a table 0.3×, moving during
+  the shaking 2×. The totals stay close to the HAZUS rates (checked in `quake.test.mjs`).
 - **On the plan (illustrative):** which walls fall, how far rubble spreads, and which doors jam
   depict the damage state; HAZUS gives building-level damage, not wall-level damage. Tall slender
   furniture topples with a median of 0.3 g (assumption, in line with FEMA E-74 guidance that
