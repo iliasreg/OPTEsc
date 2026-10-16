@@ -224,6 +224,8 @@ export class SimLayer {
     }
     const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
     const material = new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+    ctx.shadowBlur=8; ctx.lineWidth=5; ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
+    material.userData.baseCanvas=canvas;
     this.projectionMaterials.set(key,material); return material;
   }
 
@@ -236,14 +238,14 @@ export class SimLayer {
       const plan = projectionPlan(this.site,this.result,t);
       for (const arrow of plan.arrows) {
         const mesh = new THREE.Mesh(this.projectionGeometry,this.projectionMaterial('arrow'));
-        mesh.position.set(arrow.x,0.06,arrow.y); mesh.scale.set(0.85,1.3,1);
+        mesh.position.set(arrow.x,0.06,arrow.y); mesh.scale.set(1.53,2.34,1);
         mesh.rotation.set(-Math.PI/2,0,Math.atan2(-arrow.dx,-arrow.dy));
         mesh.userData = {surface:'floor',kind:'arrow',path:arrow.path,guards:arrow.guards}; this.projections.add(mesh);
       }
       for (const sign of plan.signs) {
         const door = this.site.doors.find(d=>d.id===sign.id);
         const mesh = new THREE.Mesh(this.projectionGeometry,this.projectionMaterial(sign.kind || 'blocked'));
-        mesh.position.set(sign.x,0.065,sign.y); mesh.scale.set(1.1,0.95,1); mesh.rotation.x=-Math.PI/2;
+        mesh.position.set(sign.x,0.065,sign.y); mesh.scale.set(1.65,1.425,1); mesh.rotation.x=-Math.PI/2;
         mesh.userData = {surface:'floor',doorId:sign.id}; this.projections.add(mesh);
         // Fixed on the lintel face, not a camera-facing label suspended in space.
         if (door.is_exit && !this.projections.children.some(m=>m.userData.surface==='wall'&&m.userData.doorId===sign.id)) {
@@ -252,7 +254,7 @@ export class SimLayer {
           const normal = Math.sign(acrossX ? sign.y-door.y : sign.x-door.x) || 1;
           wall.rotation.y = acrossX ? normal<0 ? Math.PI : 0 : normal*Math.PI/2;
           wall.position.set(door.x+(acrossX?0:normal*0.065),this.viewer.wallHeight-0.2,door.y+(acrossX?normal*0.065:0));
-          wall.scale.set(Math.min(1.7,door.width_m+0.4),0.35,1);
+          wall.scale.set(Math.min(1.7,door.width_m+0.4),0.6,1);
           wall.userData = {surface:'wall',doorId:sign.id}; this.projections.add(wall);
         }
       }
@@ -265,7 +267,7 @@ export class SimLayer {
             return grid.cells[Math.floor(p.z/grid.cell_m)]?.[Math.floor(p.x/grid.cell_m)]==='.';
           }));
         };
-        if(!fits()) mesh.scale.multiplyScalar(0.6);
+        for(let n=0;n<8&&!fits();n++) mesh.scale.multiplyScalar(0.85);
         mesh.userData.fitsFloor=fits();
       }
       this.projectionBucket = bucket;
@@ -279,7 +281,7 @@ export class SimLayer {
         const d=this.site.doors.find(d=>d.id===data.doorId), kind=projectionDoorKind(d,this.site,this.result,t);
         mesh.visible=!!kind && (data.surface==='floor' ? data.fitsFloor : this.viewer.wallHeight>=2.5);
         if(kind) {mesh.material=this.projectionMaterial(kind,data.surface);data.kind=kind;}
-        if(data.surface==='wall') mesh.position.y=this.viewer.wallHeight-0.2;
+        if(data.surface==='wall') mesh.position.y=this.viewer.wallHeight-0.32;
       }
     }
     this.projectionTime=t;
