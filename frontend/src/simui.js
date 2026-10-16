@@ -1,6 +1,7 @@
 // The "Fire drill" panel: start a fire, play it back in 3D and read what happened.
 import { SimLayer, PEOPLE_COLORS } from './simview.js';
 import { simulate, worstFire } from './sim.js';
+import { initExtinguisherTraining } from './extinguishertraining.js';
 import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
 
 const $ = (id) => document.getElementById(id);
@@ -9,6 +10,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 export function initSim({ viewer, getSite, setStatus }) {
   const layer = new SimLayer(viewer);
+  const equipment = initExtinguisherTraining({viewer,getSite});
   const guidance = initDrillGuidance({ getSite, onHighlight: (event, site) => layer.highlight(event, site) });
   let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
@@ -57,6 +59,7 @@ export function initSim({ viewer, getSite, setStatus }) {
   function siteChanged() {
     stop();
     guidance.siteChanged();
+    void equipment.siteChanged();
     layer.clear();
     $('player').hidden = true;
     $('sim-out').innerHTML = '';
@@ -84,6 +87,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     try {
       const evacuationExitIds = drillExitIds(await siteFingerprint(s));
       if (token !== revision || s !== getSite()) return;
+      equipment.setDrillActive(true);
       const r = await call('run', { ...simSite(s), evacuationExitIds }, opts());
       if (token !== revision || s !== getSite()) return;
       layer.show(r, s);
@@ -96,6 +100,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       setStatus(`Fire drill worked out in ${Math.round(performance.now() - t0)} ms`);
     } catch (err) {
       if (token !== revision) return;
+      equipment.setDrillActive(!!layer.result);
       setStatus(`Fire drill failed: ${err.message}`, true);
       console.error(err);
     } finally { busy = false; }
@@ -112,6 +117,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       delete o.fire;
       const evacuationExitIds = drillExitIds(await siteFingerprint(s));
       if (token !== revision || s !== getSite()) return;
+      equipment.setDrillActive(true);
       const r = await call('worst', { ...simSite(s), evacuationExitIds }, o, (done, total) => setStatus(`Fire in room ${done} of ${total}…`));
       if (token !== revision || s !== getSite()) return;
       const names = new Map(s.zones.map((z) => [z.id, z.name]));
@@ -130,6 +136,7 @@ export function initSim({ viewer, getSite, setStatus }) {
         li.addEventListener('keydown', (e) => { if (e.key === 'Enter') run(li.dataset.fire); });
       }
     } catch (err) {
+      equipment.setDrillActive(!!layer.result);
       setStatus(`Could not rank fire starts: ${err.message}`, true);
       console.error(err);
     } finally { busy = false; }
@@ -208,6 +215,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     else requestAnimationFrame(tick);
   }
 
+  $('t-projections').addEventListener('change', e => { layer.setProjections(e.target.checked); equipment.setProjectionEnabled(e.target.checked); });
   $('sim-run').addEventListener('click', () => run());
   $('sim-worst').addEventListener('click', worst);
   $('sim-fire').addEventListener('change', () => { fireAt = null; });
@@ -218,13 +226,13 @@ export function initSim({ viewer, getSite, setStatus }) {
   });
   $('pl-play').addEventListener('click', () => play(!playing));
   $('pl-time').addEventListener('input', (e) => { play(false); guidance.invalidate(); seek(parseFloat(e.target.value)); });
-  $('pl-close').addEventListener('click', () => { stop(); layer.clear(); $('player').hidden = true; });
+  $('pl-close').addEventListener('click', () => { stop(); layer.clear(); equipment.setDrillActive(false); $('player').hidden = true; });
 
   return {
     siteChanged,
     run,
     worst,
-    layer,
+    layer, equipment,
     // the 3D view was clicked; returns true when the click started a fire
     pick(zoneId, point) {
       if (!picking || !point) return false;

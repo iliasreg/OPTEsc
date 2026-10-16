@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+<title id="title">TRAINING ONLY — extinguisher control reminder</title>
+<desc id="desc">Four illustrated PASS steps for compatible portable extinguishers: pull the pin with the nozzle away from you, aim low at the base, squeeze the lever slowly and evenly, sweep side to side. This does not replace supervised practical training or the actual unit's instructions.</desc>
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0 6 3 0 6" fill="none" stroke="#26745b" stroke-width="2"/></marker>
+  <g id="bottle"><rect x="-39" y="-25" width="78" height="137" rx="25" fill="#d83c40" stroke="#78282a" stroke-width="4"/><rect x="-26" y="21" width="52" height="48" rx="4" fill="#fff"/><path d="M-15-25V-45H15V-25M-28-45H37M-25-59L36-49" stroke="#25333c" stroke-width="9" stroke-linecap="round" fill="none"/><path d="M22-35Q73-25 66 35" fill="none" stroke="#25333c" stroke-width="9" stroke-linecap="round"/></g>
+  <g id="flame"><path d="M0 60C-45 32-21 8-20-9C-5 2-12 19-2 21C16 1 5-16 18-33C40-5 60 30 29 60Z" fill="#f8aa4c" stroke="#be612a" stroke-width="3"/><path d="M1 60Q-12 40 8 18Q11 35 24 45L20 60Z" fill="#ffe6a2"/></g>
+</defs>
+<rect width="1200" height="760" rx="22" fill="#f6f4ed"/>
+<rect width="1200" height="112" rx="22" fill="#223d35"/>
+<path d="M0 90H1200V112H0Z" fill="#223d35"/>
+<g font-family="Arial,sans-serif" fill="#fff">
+  <text x="34" y="43" font-size="18" font-weight="bold" letter-spacing="2">DEMO STATION · TRAINING ONLY</text>
+  <text x="34" y="85" font-size="34" font-weight="bold">Know the controls before an incident</text>
+</g>
+<g fill="#fff" stroke="#d8ded6" stroke-width="2">
+  <rect x="25" y="132" width="565" height="236" rx="14"/><rect x="610" y="132" width="565" height="236" rx="14"/>
+  <rect x="25" y="384" width="565" height="236" rx="14"/><rect x="610" y="384" width="565" height="236" rx="14"/>
+</g>
+<g font-family="Arial,sans-serif" fill="#20372f">
+  <g transform="translate(25 132)">
+    <text x="24" y="42" font-size="29" font-weight="bold">1  PULL</text>
+    <use href="#bottle" transform="translate(119 117) scale(.85)"/>
+    <circle cx="112" cy="76" r="12" fill="none" stroke="#dba343" stroke-width="6"/>
+    <path d="M112 76H149" stroke="#dba343" stroke-width="6"/>
+    <path d="M95 72H48" stroke="#26745b" stroke-width="5" marker-end="url(#arrow)"/>
+    <text x="225" y="104" font-size="24" font-weight="bold">Remove the safety pin.</text>
+    <text x="225" y="140" font-size="21">Keep the nozzle pointed</text><text x="225" y="168" font-size="21">away from you.</text>
+  </g>
+  <g transform="translate(610 132)">
+    <text x="24" y="42" font-size="29" font-weight="bold">2  AIM LOW</text>
+    <path d="M45 151Q54 89 111 100L136 117" fill="none" stroke="#25333c" stroke-width="14" stroke-linecap="round"/>
+    <path d="M123 108L151 122" stroke="#25333c" stroke-width="19"/>
+    <use href="#flame" transform="translate(188 110) scale(.7)"/>
+    <path d="M146 127L191 151" fill="none" stroke="#26745b" stroke-width="5" marker-end="url(#arrow)"/>
+    <path d="M160 157H222" stroke="#be612a" stroke-width="4"/>
+    <text x="256" y="111" font-size="24" font-weight="bold">Aim at the base.</text>
+    <text x="256" y="148" font-size="21">Not the top of the flames.</text>
+  </g>
+  <g transform="translate(25 384)">
+    <text x="24" y="42" font-size="29" font-weight="bold">3  SQUEEZE</text>
+    <use href="#bottle" transform="translate(117 118) scale(.85)"/>
+    <path d="M90 57L146 70" stroke="#25333c" stroke-width="9" stroke-linecap="round"/>
+    <path d="M152 43V62" stroke="#26745b" stroke-width="5" marker-end="url(#arrow)"/>
+    <text x="225" y="104" font-size="24" font-weight="bold">Squeeze the lever.</text>
+    <text x="225" y="143" font-size="21">Apply pressure slowly</text><text x="225" y="171" font-size="21">and evenly.</text>
+  </g>
+  <g transform="translate(610 384)">
+    <text x="24" y="42" font-size="29" font-weight="bold">4  SWEEP</text>
+    <use href="#flame" transform="translate(129 89) scale(.8)"/>
+    <path d="M51 165Q130 121 210 165" fill="none" stroke="#26745b" stroke-width="5" marker-end="url(#arrow)"/>
+    <path d="M209 181Q129 137 49 181" fill="none" stroke="#26745b" stroke-width="5" marker-end="url(#arrow)"/>
+    <text x="256" y="111" font-size="24" font-weight="bold">Move side to side.</text>
+    <text x="256" y="148" font-size="21">Keep the nozzle aimed low.</text>
+  </g>
+  <text x="30" y="660" font-size="23" font-weight="bold">Untrained, unsure, smoke, or no clear escape route? Evacuate.</text>
+  <text x="30" y="698" font-size="20">Generic PASS reminder only. Use compatible equipment and follow its label and site training.</text>
+  <text x="30" y="731" font-size="18">Original illustrations · USFA PASS guidance · INRS: workplace training and site procedures</text>
+</g>
+</svg>

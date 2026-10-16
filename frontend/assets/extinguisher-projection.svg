@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="320" viewBox="0 0 1600 320" role="img" aria-label="Training-only extinguisher projection: pull the pin, aim low, squeeze, sweep. Untrained or unsure: evacuate.">
+<defs>
+ <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <marker id="tip" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0 5 3 0 6" fill="none" stroke="#b8ffd4" stroke-width="2"/></marker>
+ <g id="flame"><path d="M0 52C-30 26-14 9-14-7C-1 1-7 13 1 19C14-1 9-15 17-29C43 6 46 31 24 52Z" fill="none" stroke="#ffdf9b" stroke-width="6"/></g>
+</defs>
+<g filter="url(#glow)" fill="none" stroke="#eafff0" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+ <g transform="translate(200 20)">
+  <path d="M-45 148V83Q-45 54-14 54H14Q45 54 45 83V148M-16 54V33H16V54M-34 30H48M-32 15L47 27M32 41Q78 46 76 106"/>
+  <circle cx="-28" cy="36" r="13" stroke="#ffdf9b"/><path d="M-15 36H17" stroke="#ffdf9b"/>
+  <path d="M-52 36H-108" stroke="#b8ffd4" marker-end="url(#tip)"/>
+ </g>
+ <g transform="translate(600 20)">
+  <path d="M-113 114Q-105 51-46 66L-17 81M-30 74L3 92"/>
+  <use href="#flame" transform="translate(67 80)"/>
+  <path d="M7 97L60 131" stroke="#b8ffd4" marker-end="url(#tip)"/><path d="M41 137H107" stroke="#ffdf9b"/>
+ </g>
+ <g transform="translate(1000 20)">
+  <path d="M-45 148V83Q-45 54-14 54H14Q45 54 45 83V148M-16 54V33H16V54M-36 34H47M-33 13L46 26M30 43Q75 48 75 110"/>
+  <path d="M61-4V16" stroke="#b8ffd4" marker-end="url(#tip)"/>
+ </g>
+ <g transform="translate(1400 20)">
+  <use href="#flame" transform="translate(-8 55)"/>
+  <path d="M-104 142Q0 98 103 142M104 169Q0 125-104 169" stroke="#b8ffd4" marker-end="url(#tip)"/>
+ </g>
+</g>
+<g fill="#eafff0" font-family="Arial,sans-serif" font-size="43" font-weight="bold" text-anchor="middle" filter="url(#glow)">
+ <text x="200" y="243">1 · PULL PIN</text><text x="600" y="243">2 · AIM LOW</text><text x="1000" y="243">3 · SQUEEZE</text><text x="1400" y="243">4 · SWEEP</text>
+</g>
+<text x="800" y="300" fill="#ffdf9b" font-family="Arial,sans-serif" font-size="28" text-anchor="middle">TRAINING ONLY · Follow the unit’s label and site training · Untrained or unsure? EVACUATE</text>
+</svg>
