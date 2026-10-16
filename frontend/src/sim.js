@@ -405,7 +405,8 @@ function freeAround(g, i) {
 // need: when given (a Uint8Array marking cells, and their count), the search stops once every
 // marked cell is settled. It runs outwards from the exits, so every cell nearer an exit than a
 // marked one is settled too: people walking downhill towards an exit only ever read final values.
-function routeField(g, hz, t, field, isTarget = (i) => g.kind[i] === K.EXIT, passable = (i) => walkable(g.kind[i]), need = null) {
+// maxSmoke: cells with at least this much smoke count as closed (projected guidance).
+export function routeField(g, hz, t, field, isTarget = (i) => g.kind[i] === K.EXIT, passable = (i) => walkable(g.kind[i]), need = null, maxSmoke = Infinity) {
   const { w, h, c } = g, n = w * h;
   let left = need ? need.count : -1;
   field.fill(Infinity);
@@ -417,7 +418,7 @@ function routeField(g, hz, t, field, isTarget = (i) => g.kind[i] === K.EXIT, pas
   // round it where they can and pass it only when there is no other way; worked out a little
   // ahead, as the fire grows while they walk
   const near = hz.keepOut ? hz.keepOut[Math.max(0, Math.min(hz.keepOut.length - 1, Math.floor(t + 10)))] : -1;
-  for (let i = 0; i < n; i++) if (passable(i) && hz.fireT[i] > t + 2) {
+  for (let i = 0; i < n; i++) if (passable(i) && hz.fireT[i] > t + 2 && !(smokeAt(hz, i, t) >= maxSmoke)) {
     ok[i] = 1; cost[i] = 1 + 4 * smokeAt(hz, i, t);
     if (hz.fireDist && hz.fireDist[i] < near) cost[i] *= 20;
     if (hz.rubbleT && hz.rubbleT[i] <= t) cost[i] *= 3; // climbing over rubble

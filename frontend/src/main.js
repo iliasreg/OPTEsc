@@ -422,7 +422,7 @@ for (const id of ['p-width', 'p-cell', 'p-door', 'p-filter']) {
   });
 }
 $('p-travel').addEventListener('change', () => resegment());
-$('p-height').addEventListener('input', (e) => viewer.setWallHeight(parseFloat(e.target.value)));
+$('p-height').addEventListener('input', (e) => { viewer.setWallHeight(parseFloat(e.target.value)); sim.equipment.refresh(); });
 $('t-overlay').addEventListener('change', (e) => viewer.setOverlay(e.target.checked));
 $('t-labels').addEventListener('change', (e) => viewer.setLabels(e.target.checked));
 $('t-objects').addEventListener('change', (e) => viewer.setObjects(e.target.checked));

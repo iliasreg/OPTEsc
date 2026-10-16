@@ -130,6 +130,21 @@ export class Viewer {
       s.visible = this.mode === 'orbit' || s.userData.exit;
     }
   }
+  setDrillLighting(on) {
+    this.drillLighting = on;
+    this.scene.background.set(on ? '#0d1513' : '#dfe6ee');
+    this.scene.fog.color.copy(this.scene.background);
+    this.sun.intensity = on ? 1.6*0.42 : 1.6;
+    const ambient = this.scene.children.find(o => o.isHemisphereLight);
+    if (ambient) ambient.intensity = on ? 1.4*0.42 : 1.4;
+    this.root.traverse(o=>{if(!o.isMesh||!o.material)return;
+      for(const m of [o.material].flat())if(m.color){
+        m.userData.idleColor ||= m.color.clone();m.color.copy(m.userData.idleColor);
+        if(on){if(o.name==='exterior-ground')m.color.set('#14201b');else m.color.lerp(new THREE.Color('#56645e'),0.46);}
+      }
+    });
+  }
+
   setWallHeight(hm) { this.wallHeight = hm; this.refresh(); }
 
   setMode(mode) {
@@ -177,6 +192,7 @@ export class Viewer {
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(W / 2, -0.02, H / 2);
+    ground.name = 'exterior-ground';
     ground.receiveShadow = true;
     this.root.add(ground);
 
@@ -324,6 +340,7 @@ export class Viewer {
     const cam = this.sun.shadow.camera;
     cam.left = -d; cam.right = d; cam.top = d; cam.bottom = -d; cam.near = 1; cam.far = d * 3;
     cam.updateProjectionMatrix();
+    this.setDrillLighting(!!this.drillLighting);
   }
 
   // One merged mesh per material: objects as blocks (tables as a top on a base), stairs as steps.
@@ -441,6 +458,7 @@ export class Viewer {
         if (!this._blocked(p.x, p.z + mv.z)) p.z += mv.z;
       }
     }
+    this.projectionEffectsTick?.(performance.now());
     this.renderer.render(this.scene, this.camera);
   }
 

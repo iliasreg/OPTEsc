@@ -2,6 +2,7 @@
 // layer that comes down from the ceiling as it thickens.
 import * as THREE from 'three';
 import { smokeAt, STATE } from './sim.js';
+import { projectionPlan, projectionDoorKind } from './drillevents.js';
 
 export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b' };
 const STATE_COLOR = {
@@ -51,6 +52,11 @@ export class SimLayer {
     viewer.scene.add(this.group);
     this.result = null;
     this.t = 0;
+    this.projections = new THREE.Group();
+    this.projections.name = 'projected-drill-guidance';
+    viewer.scene.add(this.projections);
+    this.projectionsEnabled = true;
+    this.projectionMaterials = new Map();
   }
 
   highlight(event, site) {
@@ -88,6 +94,10 @@ export class SimLayer {
     this.highlight(null, null);
     this.quakeView?.dispose();
     this.quakeView = null;
+    this.projections.clear();
+    this.projectionGeometry?.dispose(); this.projectionGeometry = null;
+    for (const material of this.projectionMaterials.values()) { material.map.dispose(); material.dispose(); }
+    this.projectionMaterials.clear(); this.projectionBucket = null; this.projectionTime = null;
     for (const o of [...this.group.children]) {
       this.group.remove(o);
       o.geometry?.dispose();
@@ -99,6 +109,7 @@ export class SimLayer {
   show(result, site) {
     this.clear();
     this.result = result;
+    this.site = site;
     const g = site.grid, c = g.cell_m, w = g.w, h = g.h;
     this.c = c; this.w = w; this.h = h;
     const N = result.people.length;
@@ -233,6 +244,103 @@ export class SimLayer {
     this.flames.instanceColor.needsUpdate = true;
     if (this.light) this.light.intensity = zone ? Math.min(40, zone.Q[sec] / 100) : burning ? Math.min(40, 4 + burning * 0.6) : 0;
     this.quakeView?.update(t);
+    this.updateProjections(t);
+  }
+
+  setProjections(on) {
+    this.projectionsEnabled = on;
+    this.projections.visible = on;
+    if (on && this.result) { this.projectionBucket = null; this.updateProjections(this.t); }
+  }
+
+  projectionMaterial(kind, surface = 'floor') {
+    const key = `${surface}:${kind}`;
+    if (this.projectionMaterials.has(key)) return this.projectionMaterials.get(key);
+    const canvas = document.createElement('canvas'); canvas.width = surface==='wall'?1024:512; canvas.height = surface==='wall'?256:512;
+    const ctx = canvas.getContext('2d');
+    const green = kind === 'arrow' || kind === 'exit';
+    ctx.strokeStyle = ctx.fillStyle = green ? '#a1ffbf' : kind === 'smoke' ? '#ffe18a' : '#ff8880';
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18;
+    ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.textAlign = 'center';
+    const text=({arrow:'DRILL',exit:'DRILL EXIT',excluded:'NOT AN EXIT',blocked:'ROUTE BLOCKED',smoke:'SMOKE'})[kind];
+    if(surface==='wall') {
+      ctx.font='bold 74px sans-serif'; ctx.fillText(`${green?'':'×  '}${text}`,512,156);
+    } else {
+    if (kind === 'arrow') {
+      ctx.beginPath(); ctx.moveTo(256,65); ctx.lineTo(390,220); ctx.lineTo(307,220);
+      ctx.lineTo(307,375); ctx.lineTo(205,375); ctx.lineTo(205,220); ctx.lineTo(122,220); ctx.closePath(); ctx.fill();
+    } else if (kind === 'exit') {
+      ctx.strokeRect(160,70,190,235); ctx.beginPath(); ctx.moveTo(190,190); ctx.lineTo(320,190);
+      ctx.moveTo(270,145); ctx.lineTo(320,190); ctx.lineTo(270,235); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(166,95); ctx.lineTo(346,275); ctx.moveTo(346,95); ctx.lineTo(166,275); ctx.stroke();
+    }
+    ctx.shadowBlur = 6; ctx.font = 'bold 43px sans-serif';
+    ctx.fillText(text,256,445);
+    }
+    const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
+    const material = new THREE.MeshBasicMaterial({map,transparent:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+    ctx.shadowBlur=8; ctx.lineWidth=5; ctx.strokeRect(12,12,canvas.width-24,canvas.height-24);
+    material.userData.baseCanvas=canvas;
+    this.projectionMaterials.set(key,material); return material;
+  }
+
+  updateProjections(t) {
+    if (!this.result || !this.projectionsEnabled) return;
+    const bucket = Math.floor(t/2);
+    if (bucket !== this.projectionBucket || t < this.projectionTime) {
+      this.projections.clear();
+      this.projectionGeometry ||= new THREE.PlaneGeometry(1,1);
+      const plan = projectionPlan(this.site,this.result,t);
+      for (const arrow of plan.arrows) {
+        const mesh = new THREE.Mesh(this.projectionGeometry,this.projectionMaterial('arrow'));
+        mesh.position.set(arrow.x,0.06,arrow.y); mesh.scale.set(1.53,2.34,1);
+        mesh.rotation.set(-Math.PI/2,0,Math.atan2(-arrow.dx,-arrow.dy));
+        mesh.userData = {surface:'floor',kind:'arrow',path:arrow.path,guards:arrow.guards}; this.projections.add(mesh);
+      }
+      for (const sign of plan.signs) {
+        const door = this.site.doors.find(d=>d.id===sign.id);
+        const mesh = new THREE.Mesh(this.projectionGeometry,this.projectionMaterial(sign.kind || 'blocked'));
+        mesh.position.set(sign.x,0.065,sign.y); mesh.scale.set(1.65,1.425,1); mesh.rotation.x=-Math.PI/2;
+        mesh.userData = {surface:'floor',doorId:sign.id}; this.projections.add(mesh);
+        // Fixed on the lintel face, not a camera-facing label suspended in space.
+        if (door.is_exit && !this.projections.children.some(m=>m.userData.surface==='wall'&&m.userData.doorId===sign.id)) {
+          const wall = new THREE.Mesh(this.projectionGeometry,mesh.material);
+          const acrossX = door.along === 'x';
+          const normal = Math.sign(acrossX ? sign.y-door.y : sign.x-door.x) || 1;
+          wall.rotation.y = acrossX ? normal<0 ? Math.PI : 0 : normal*Math.PI/2;
+          wall.position.set(door.x+(acrossX?0:normal*0.065),this.viewer.wallHeight-0.2,door.y+(acrossX?normal*0.065:0));
+          wall.scale.set(Math.min(1.7,door.width_m+0.4),0.6,1);
+          wall.userData = {surface:'wall',doorId:sign.id}; this.projections.add(wall);
+        }
+      }
+      for(const mesh of this.projections.children.filter(m=>m.userData.surface==='floor')) {
+        const fits=()=>{
+          mesh.updateMatrixWorld(true);
+          const grid=this.site.grid;
+          return [-0.5,0,0.5].every(x=>[-0.5,0,0.5].every(y=>{
+            const p=new THREE.Vector3(x,y,0).applyMatrix4(mesh.matrixWorld);
+            return grid.cells[Math.floor(p.z/grid.cell_m)]?.[Math.floor(p.x/grid.cell_m)]==='.';
+          }));
+        };
+        for(let n=0;n<8&&!fits();n++) mesh.scale.multiplyScalar(0.85);
+        mesh.userData.fitsFloor=fits();
+      }
+      this.projectionBucket = bucket;
+    }
+    // Withdraw a cached arrow immediately if its path changes before the next replan.
+    const hz = this.result.hazard;
+    for (const mesh of this.projections.children) {
+      const data=mesh.userData;
+      if (data.path) mesh.visible=data.fitsFloor && data.guards.every(i=>hz.fireT[i]>t+2 && smokeAt(hz,i,t)<0.1);
+      else {
+        const d=this.site.doors.find(d=>d.id===data.doorId), kind=projectionDoorKind(d,this.site,this.result,t);
+        mesh.visible=!!kind && (data.surface==='floor' ? data.fitsFloor : this.viewer.wallHeight>=2.5);
+        if(kind) {mesh.material=this.projectionMaterial(kind,data.surface);data.kind=kind;}
+        if(data.surface==='wall') mesh.position.y=this.viewer.wallHeight-0.32;
+      }
+    }
+    this.projectionTime=t;
   }
 
   // counts at time t for the playback readout
