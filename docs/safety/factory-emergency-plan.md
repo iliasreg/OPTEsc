@@ -29,7 +29,7 @@ These IDs come from the current DXF import, not from an invented route map.
 
 D1 is a 4 m loading opening. It is NOT approved as a pedestrian evacuation exit in this fictional policy. D11 is reported by the importer as inward-opening; its suitability requires review against French rules and the population served. D9 is a candidate pedestrian exit, not a certified safe exit.
 
-The existing simulator may still route through D1 or D11. The RAG feature does not change that simulation or validate its routes. A simulated escape path is not permission to use that path. No turn-by-turn, “nearest exit” or “this route is safe” instruction may be generated from this draft.
+The sample software drill permits D9 only as an illustrative evacuation destination. It excludes D1 (loading shutter) and D11 (pending review) from evacuation routing, including worst-case runs. This policy applies only to the exact bound sample geometry; imported or edited plans require a site-specific exit policy before running a drill. These restrictions do not certify D9 or validate real-world routes. No turn-by-turn, “nearest exit” or “this route is safe” instruction may be generated from this draft.
 
 Before a physical drill, resolve these issues, assess the number and width of exits for the actual establishment, inspect the site and publish approved routes. Until then use this plan only in the software demo.
 

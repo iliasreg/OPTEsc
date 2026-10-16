@@ -1,7 +1,7 @@
 // The "Fire drill" panel: start a fire, play it back in 3D and read what happened.
 import { SimLayer, PEOPLE_COLORS } from './simview.js';
 import { simulate, worstFire } from './sim.js';
-import { initDrillGuidance } from './drillguidance.js';
+import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
 
 const $ = (id) => document.getElementById(id);
 const mmss = (s) => { if (s == null) return '–'; const r = Math.round(s); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
@@ -9,7 +9,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 export function initSim({ viewer, getSite, setStatus }) {
   const layer = new SimLayer(viewer);
-  const guidance = initDrillGuidance({ getSite });
+  const guidance = initDrillGuidance({ getSite, onHighlight: (event, site) => layer.highlight(event, site) });
   let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
   let picking = false, playing = false, last = 0, busy = false;
@@ -82,7 +82,9 @@ export function initSim({ viewer, getSite, setStatus }) {
     setStatus('Running the fire drill…');
     const t0 = performance.now();
     try {
-      const r = await call('run', simSite(s), opts());
+      const evacuationExitIds = drillExitIds(await siteFingerprint(s));
+      if (token !== revision || s !== getSite()) return;
+      const r = await call('run', { ...simSite(s), evacuationExitIds }, opts());
       if (token !== revision || s !== getSite()) return;
       layer.show(r, s);
       guidance.start(r, s);
@@ -108,7 +110,9 @@ export function initSim({ viewer, getSite, setStatus }) {
     try {
       const o = opts();
       delete o.fire;
-      const r = await call('worst', simSite(s), o, (done, total) => setStatus(`Fire in room ${done} of ${total}…`));
+      const evacuationExitIds = drillExitIds(await siteFingerprint(s));
+      if (token !== revision || s !== getSite()) return;
+      const r = await call('worst', { ...simSite(s), evacuationExitIds }, o, (done, total) => setStatus(`Fire in room ${done} of ${total}…`));
       if (token !== revision || s !== getSite()) return;
       const names = new Map(s.zones.map((z) => [z.id, z.name]));
       const items = r.runs.map((x) => {
@@ -148,7 +152,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     };
     const harmed = m.overcome + m.trapped;
     const where = r.fire.zone ? zname.get(r.fire.zone) : 'the picked spot';
-    let html = `<div id="sim-stats">
+    let html = `<p>Sample drill exit policy: D9 only. D1 (loading shutter) and D11 (pending review) are excluded. This is not exit certification.</p><div id="sim-stats">
       <div class="${m.all_out_s == null ? 'bad' : ''}"><b>${m.all_out_s == null ? `${m.out} of ${m.people}` : mmss(m.all_out_s)}</b><span>${m.all_out_s == null ? 'got out' : `everyone out (${m.people} people)`}</span></div>
       <div><b>${mmss(m.p95_out_s)}</b><span>95% out</span></div>
       <div class="${m.overcome ? 'bad' : ''}"><b>${m.overcome}</b><span>overcome by smoke or fire</span></div>

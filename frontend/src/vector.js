@@ -9,6 +9,7 @@ const AREA_RE = /(\d+(?:[.,]\d+)?)\s*(?:m²|m2|sq\.?\s*m|㎡)/i;
 // ---------- DXF ----------
 
 export function parseDxf(text) {
+  if (!/^\s*0\r?\nSECTION\s*$/m.test(text) || !/^\s*0\r?\nEOF\s*$/m.test(text)) throw new Error('Invalid DXF: expected an ASCII DXF drawing.');
   const lines = text.split(/\r?\n/);
   const pairs = [];
   for (let i = 0; i + 1 < lines.length; i += 2) pairs.push([parseInt(lines[i], 10), lines[i + 1].trim()]);

@@ -24,9 +24,11 @@ Use `./run.sh 9000` for another port. Stop the server with `Ctrl+C`.
 - **Details** — inspect building checks, drill results and room measurements; export Site JSON or IFC.
 - **View** — orbit, walk through the building or edit the plan.
 
-Subtitles identify simulated fire, smoke and blocked doors during playback. Instructions include source references and update when you rewind.
+Subtitles identify simulated fire, smoke and blocked doors during playback and highlight the named room or door. Instructions include source references and update when you rewind.
 
-DXF, PDF and image plans are supported, along with saved Site JSON. Plan reading and simulation run locally in the browser. Imported geometry and inferred exits require review.
+Plan import is **DXF-only** (`.dxf`, case-insensitive), through both the file picker and drag-and-drop. PDF, images, IFC and saved Site JSON are rejected before reading. Site JSON and IFC exports remain available, including the IFC export preview. Plan reading and simulation run locally in the browser; raster OCR and AI wall detection are not used. Imported geometry, scale and inferred exits still require review before running a drill.
+
+The sample drill uses D9 only; it excludes the loading shutter D1 and the unresolved exit D11. Imported or edited geometry needs a site-specific exit policy before a drill can run. The sample policy does not certify any real exit.
 
 ## Optional AI guidance
 
@@ -48,7 +50,7 @@ Requires Node.js 20+ for the JavaScript tests.
 
 ```bash
 python3 -m unittest discover -s tests -p 'test_drill_rag.py'
-node --test tests/sim.test.mjs tests/drillguidance.test.mjs
+node --test tests/*.test.mjs
 ```
 
 ## License
