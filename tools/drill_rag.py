@@ -19,7 +19,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE_ID = "factory-demo-fr-v1"
-SCENARIOS = {"alarm", "smoke", "blocked_route", "assistance", "assembly"}
+SCENARIOS = {
+    "alarm",
+    "smoke",
+    "blocked_route",
+    "assistance",
+    "assembly",
+    "earthquake",
+    "earthquake_after",
+    "earthquake_aftershock",
+}
 NOTICE = "Curated fictional-site prototype templates, not professionally reviewed. Not for emergency use."
 MAX_BODY = 2048
 

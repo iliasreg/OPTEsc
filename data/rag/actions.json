@@ -96,5 +96,38 @@
       "assembly"
     ],
     "required": true
+  },
+  "quake_cover": {
+    "text": "During shaking, stay indoors. Shelter under sturdy furniture if available, protect your head with your arms, and keep away from windows. Do not run outside.",
+    "citations": [
+      "company-Q1",
+      "prefecture-earthquake"
+    ],
+    "scenarios": [
+      "earthquake"
+    ],
+    "required": true
+  },
+  "quake_after": {
+    "text": "After shaking stops, follow the instructor’s site procedure. Use only a confirmed usable exit; keep away from damaged walls and falling objects. Do not use lifts or re-enter without official authorisation.",
+    "citations": [
+      "company-Q2",
+      "prefecture-earthquake_after"
+    ],
+    "scenarios": [
+      "earthquake_after"
+    ],
+    "required": true
+  },
+  "quake_aftershock": {
+    "text": "An aftershock is shaking the building. Protect your head and shelter where you are, away from windows and falling objects. If already outside, stay clear of buildings and overhead power lines.",
+    "citations": [
+      "company-Q3",
+      "prefecture-earthquake_aftershock"
+    ],
+    "scenarios": [
+      "earthquake_aftershock"
+    ],
+    "required": true
   }
 }

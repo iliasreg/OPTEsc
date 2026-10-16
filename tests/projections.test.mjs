@@ -38,3 +38,33 @@ test('fire-blocked exit withdraws arrows at navigation threshold without future 
   assert.equal(plan.signs.find(s=>s.id==='D9').kind,'blocked');
   assert.equal(plan.arrows.length,0);
 });
+
+function quakeFixture(){
+ const f=fixture(),n=f.site.grid.w*f.site.grid.h;
+ f.result.quake={duration:0,events:[{t:5,type:'door'}],aftershock:{t:20,duration:2}};
+ f.hazard.blockT=new Float32Array(n).fill(Infinity);f.hazard.rubbleT=new Float32Array(n).fill(Infinity);
+ return f;
+}
+test('quake arrows change destination at the exact door jam and rewind restores it',()=>{
+ const {site,result,hazard}=quakeFixture();result.metrics.exits.push({id:'D1'});hazard.blockT[17]=5;
+ assert.equal(projection.projectionDoorKind(site.doors[1],site,result,4.999),'exit');
+ const before=projection.projectionPlan(site,result,4.999),after=projection.projectionPlan(site,result,5);
+ assert.ok(before.arrows.some(a=>a.path.at(-1)===17));
+ assert.ok(after.arrows.length>0);assert.ok(after.arrows.every(a=>a.path.at(-1)===35&&!a.guards.includes(17)));
+ assert.equal(after.signs.find(s=>s.id==='D9').kind,'blocked');
+ assert.deepEqual(projection.projectionPlan(site,result,4.999),before);
+});
+test('rubble and toppled furniture are excluded without creating exits through collapsed walls',()=>{
+ const {site,result,hazard}=quakeFixture();
+ for(const i of [14,23,32])hazard.rubbleT[i]=5;
+ assert.ok(projection.projectionPlan(site,result,4.999).arrows.length>0);
+ assert.equal(projection.projectionPlan(site,result,5).arrows.length,0);
+ assert.ok(projection.projectionPlan(site,result,0).arrows.length>0);
+});
+test('route arrows stay off throughout shaking and aftershocks',()=>{
+ const {site,result}=quakeFixture();result.quake.duration=2;
+ assert.equal(projection.projectionPlan(site,result,1).arrows.length,0);
+ assert.ok(projection.projectionPlan(site,result,3).arrows.length>0);
+ assert.equal(projection.projectionPlan(site,result,20).arrows.length,0);
+ assert.ok(projection.projectionPlan(site,result,22.6).arrows.length>0);
+});
