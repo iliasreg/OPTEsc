@@ -174,3 +174,9 @@ test('cloud cache cannot reuse a fire alarm instruction for an earthquake alarm'
  await new Promise(r=>setTimeout(r,650));await flush();
  assert.deepEqual(posts,['alarm','earthquake']);assert.match($('rag-action').textContent,/Cloud quake cover/);g.stop();
 });
+
+test('AI selection starts enabled and stays enabled after a site reset',async()=>{
+ const $=dom(),s=site();globalThis.fetch=async()=>({ok:true,json:async()=>await reference(s)});
+ const g=initDrillGuidance({getSite:()=>s});assert.equal($('rag-enable').checked,true);
+ $('rag-enable').checked=false;g.siteChanged();assert.equal($('rag-enable').checked,true);await flush();g.stop();
+});
