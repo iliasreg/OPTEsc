@@ -1,5 +1,6 @@
 // The "Fire drill" panel: start a fire, play it back in 3D and read what happened.
 import { SimLayer, PEOPLE_COLORS } from './simview.js';
+import { initProjectionEffects } from './projectioneffects.js';
 import { simulate, worstFire } from './sim.js';
 import { initExtinguisherTraining } from './extinguishertraining.js';
 import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
@@ -11,6 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 export function initSim({ viewer, getSite, setStatus }) {
   const layer = new SimLayer(viewer);
   const equipment = initExtinguisherTraining({viewer,getSite});
+  initProjectionEffects(viewer,layer,equipment);
   const guidance = initDrillGuidance({ getSite, onHighlight: (event, site) => layer.highlight(event, site) });
   let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
@@ -200,6 +202,7 @@ export function initSim({ viewer, getSite, setStatus }) {
   }
   function play(on) {
     playing = on && !!layer.result;
+    viewer.setDrillLighting(playing);
     $('pl-play').textContent = playing ? '❚❚' : '▶';
     $('pl-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
     if (playing) { if (layer.t >= layer.duration) seek(0); last = performance.now(); requestAnimationFrame(tick); }

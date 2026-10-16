@@ -23,7 +23,7 @@ test('usage graphics are a transparent wall projection, not an opaque poster or 
   const mesh=equipment.createExtinguisherProjection(station,new THREE.Texture());
   assert.equal(mesh.userData.surface,'wall');
   assert.equal(mesh.material.transparent,true);
-  assert.equal(mesh.material.blending,THREE.AdditiveBlending);
+  assert.equal(mesh.material.blending,THREE.NormalBlending);
   assert.equal(mesh.material.depthTest,true);
   assert.equal(mesh.rotation.y,-Math.PI/2);
   assert.equal(mesh.position.x+station.x,station.wallX);
@@ -32,7 +32,8 @@ test('usage graphics are a transparent wall projection, not an opaque poster or 
 
 test('equipment UI focuses the wall, with no floating card or modal',()=>{
   const html=fs.readFileSync(new URL('../frontend/index.html',import.meta.url),'utf8');
-  assert.match(html,/Show extinguisher projection/);
+  assert.doesNotMatch(html,/Show extinguisher projection/);
+  assert.doesNotMatch(source,/evacuationMap|fillText\('EVACUATE/);
   assert.doesNotMatch(html,/id="ext-callout|id="ext-training-dialog/);
   assert.match(html,/hands-on training/i);
   assert.match(html,/usfa\.fema\.gov/);

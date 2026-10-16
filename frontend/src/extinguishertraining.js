@@ -7,8 +7,8 @@ export function trainingStation(fingerprint) {
 }
 
 export function createExtinguisherProjection(station,map) {
-  const material=new THREE.MeshBasicMaterial({map,transparent:true,blending:THREE.AdditiveBlending,depthTest:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
-  const projection=new THREE.Mesh(new THREE.PlaneGeometry(5.2,1.04),material);
+  const material=new THREE.MeshBasicMaterial({map,transparent:true,blending:THREE.NormalBlending,depthTest:true,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+  const projection=new THREE.Mesh(new THREE.PlaneGeometry(5.2,1.4),material);
   projection.name='extinguisher-wall-projection';
   projection.position.set(station.wallX-station.x,1.85,1.65);
   projection.rotation.y=-Math.PI/2;
@@ -17,24 +17,17 @@ export function createExtinguisherProjection(station,map) {
 }
 
 export function initExtinguisherTraining({viewer,getSite}) {
-  const button=document.getElementById('ext-training'),status=document.getElementById('ext-training-status');
+  const status=document.getElementById('ext-training-status');
   const group=new THREE.Group();group.name='fictional-extinguisher-training';viewer.scene.add(group);
   let station=null,board=null,active=false,generation=0,projectionOn=true;
   const trainingMap=new THREE.TextureLoader().load('./assets/extinguisher-projection.svg');
   trainingMap.colorSpace=THREE.SRGBColorSpace;
-  const canvas=document.createElement('canvas');canvas.width=1600;canvas.height=320;
-  const ctx=canvas.getContext('2d');ctx.textAlign='center';ctx.fillStyle='#b8ffd4';ctx.shadowColor='#b8ffd4';ctx.shadowBlur=12;
-  ctx.font='bold 136px sans-serif';ctx.fillText('EVACUATE',800,155);
-  ctx.font='44px sans-serif';ctx.fillText('Follow the drill marshal. Do not stop for this training station.',800,250);
-  const evacuationMap=new THREE.CanvasTexture(canvas);evacuationMap.colorSpace=THREE.SRGBColorSpace;
-
   function refresh() {
-    button.disabled=!station;
-    status.textContent=!station?'Projection unavailable for this plan.':active?'Evacuation message projected beside the demo extinguisher.':'Four training pictograms projected on the wall beside the fictional extinguisher.';
+    status.textContent=!station?'Projection unavailable for this plan.':'Four training pictograms projected beside the fictional extinguisher. Generic reminder—not an instruction to stop evacuating.';
     if(board) {
-      board.material.map=active?evacuationMap:trainingMap;board.material.needsUpdate=true;
+      board.material.map=trainingMap;
       board.visible=projectionOn&&viewer.wallHeight>=2.4;
-      board.userData.mode=active?'evacuation':'training';
+      board.userData.mode='training';
     }
   }
   function clear() {group.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});group.clear();board=null;station=null;}
@@ -63,7 +56,6 @@ export function initExtinguisherTraining({viewer,getSite}) {
     viewer.camera.position.set(station.x-4.4,2.2,station.y+1.65);viewer.orbit.update();
     const toggle=document.getElementById('t-projections');toggle.checked=true;toggle.dispatchEvent(new Event('change'));
   }
-  button.addEventListener('click',open);
   viewer.renderer.domElement.addEventListener('click',event=>{
     if(!station||document.body.dataset.tab!=='3d')return;
     const box=viewer.renderer.domElement.getBoundingClientRect(),ray=new THREE.Raycaster();
