@@ -94,13 +94,25 @@
   .verdict b { font-size: 16px; } .verdict.ok { background: color-mix(in srgb, #2f9e5b 14%, var(--panel)); } .verdict.ok b { color: #2f9e5b; }
   .verdict.bad { background: color-mix(in srgb, var(--crit) 14%, var(--panel)); } .verdict.bad b { color: var(--crit); }
   .simnote { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  .pick-scenario { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .pick-scenario button { padding: 12px 8px; font-size: 15px; font-weight: 600; }
+  .linkish { background: none; border: 0; padding: 0 0 8px; color: var(--accent); font-size: 12px; text-decoration: underline; justify-self: start; }
+  .linkish[aria-pressed="true"] { background: none; color: var(--crit); }
+  .go-further { margin-top: 10px; } .go-further button { flex: 1 1 100%; }
+  .headline { font-size: 16px; font-weight: 650; margin: 2px 0 8px; } .headline.ok { color: #2f9e5b; } .headline.bad { color: var(--crit); }
+  .tech { margin-top: 10px; font-size: 12px; color: var(--muted); } .tech summary { font-size: 12px; }
+  #pl-alarm { display: none; font-size: 12px; font-weight: 700; color: #fff; background: var(--crit); border-radius: 12px; padding: 2px 8px; white-space: nowrap; }
+  #pl-alarm.on { display: inline-block; animation: blink 1s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+  @media (prefers-reduced-motion: reduce) { #pl-alarm.on { animation: none; } }
   #sim-h3 { font-size: 12px; color: var(--muted); margin: 10px 0 0; font-weight: 600; }
   #player { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; z-index: 3; }
   #player[hidden] { display: none; }
   #player input[type=range] { flex: 1; min-width: 60px; }
   #player .clock { font-variant-numeric: tabular-nums; min-width: 52px; font-weight: 600; }
-  #player .counts { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  #player .counts i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; vertical-align: -1px; }
+  #pl-counts { position: absolute; left: 12px; top: 12px; z-index: 3; display: grid; gap: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--text); pointer-events: none; }
+  #pl-counts:empty, body:not(:has(#player:not([hidden]))) #pl-counts { display: none; }
+  #pl-counts i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
   body:has(#player:not([hidden])) .hint { display: none; }
   #drill-subtitle { position: absolute; left: 18px; right: 18px; bottom: 78px; z-index: 3; pointer-events: none; background: rgba(16,22,29,.94); color: #fff; border-radius: 10px; padding: 12px 16px; font-size: 15px; line-height: 1.4; }
   #drill-subtitle[hidden] { display: none; }
@@ -108,7 +120,7 @@
   #rag-action { margin-top: 4px; color: #e2edff; }
   #rag-citations { margin-top: 5px; font-size: 11px; color: #b9c6d8; }
   @media (max-width: 800px) { #drill-subtitle { bottom: 112px; font-size: 13px; padding: 8px 10px; } }
-  @media (max-width: 800px) { #player { flex-wrap: wrap; } #player .counts { width: 100%; } }
+  @media (max-width: 800px) { #player { flex-wrap: wrap; } #pl-counts { font-size: 11px; padding: 6px 8px; } }
   @media (max-width: 800px) {
     body { grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
     aside { order: 2; border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
@@ -125,7 +137,7 @@
     <p style="margin:6px 0 0;color:var(--muted)">Upload a DXF plan. Review inferred walls, doors, exits and rooms before using the 3D model.</p>
   </div>
   <div class="row">
-    <label class="btn primary">Upload plan<input id="file" type="file" accept=".dxf" hidden></label>
+    <label class="btn primary">Open a plan (DXF)<input id="file" type="file" accept=".dxf" hidden></label>
     <select id="sample" aria-label="Load a sample" style="width:auto"><option value="dxf">Sample: DXF</option></select>
   </div>
   <div class="row">
@@ -139,7 +151,7 @@
     <p id="scale-note"></p>
     <label class="f">Building width (m)<input id="p-width" type="number" step="0.1" min="1" value="40"></label>
     <details>
-      <summary>Detection settings</summary>
+      <summary>Plan reading settings</summary>
       <label class="f">Grid cell (m)<input id="p-cell" type="number" step="0.05" min="0.05" value="0.25"></label>
       <label class="f">Max door width (m)<input id="p-door" type="number" step="0.1" min="0.3" value="1.2"></label>
       <label class="f">Max travel to exit (m)<input id="p-travel" type="number" step="1" min="5" value="45"></label>
@@ -149,37 +161,38 @@
   </section>
   <section><div id="stats"></div></section>
   <section id="sim">
-    <h2>Fire drill</h2>
-    <label class="f">Emergency<select id="sim-scenario"><option value="fire" selected>Fire</option><option value="earthquake">Earthquake</option></select></label>
-    <label class="f">Building use<select id="sim-use"></select></label>
-    <label class="f fire-only">Fire starts in<select id="sim-fire"></select></label>
-    <label class="f quake-only">Shaking<select id="sim-quake"><option value="moderate">Moderate (0.15 g)</option><option value="strong" selected>Strong (0.3 g)</option><option value="severe">Severe (0.5 g)</option><option value="extreme">Extreme (0.8 g)</option></select></label>
-    <label class="f quake-only">Structure<select id="sim-building"></select></label>
-    <label class="f quake-only">Seismic design<select id="sim-design"><option value="pre">Before codes</option><option value="low" selected>Low code</option><option value="moderate">Moderate code</option><option value="high">High code</option></select></label>
-    <label class="f">People<input id="sim-people" type="number" min="0" step="1" placeholder="auto"></label>
-    <label class="f">Who is inside<select id="sim-mix"><option value="workforce" selected>Staff at work</option><option value="public">Open to the public</option><option value="care">Care home or hospital</option><option value="adults">Adults only</option></select></label>
-    <label class="f" id="sim-stairs-row" hidden title="On an upper floor the stairs are the way out. Wheelchair users cannot use them and wait for help at the landing.">Stairs lead down to the exit<input id="sim-stairs" type="checkbox" style="justify-self:end;width:auto"></label>
-    <details class="workspace-group fire-only" id="sim-systems"><summary>Fire safety systems</summary>
-      <label class="f">Detection<select id="sim-detect"><option value="smoke" selected>Smoke detectors</option><option value="heat">Heat detectors</option><option value="none">None (manual alarm)</option></select></label>
-      <label class="f">Sprinklers<select id="sim-sprinklers"><option value="none" selected>None</option><option value="quick">Quick response</option><option value="standard">Standard response</option></select></label>
-      <label class="f">Alarm<select id="sim-alarm"><option value="standard" selected>Bells or sirens</option><option value="voice">Voice messages</option></select></label>
-      <label class="f">Inside doors<select id="sim-doors"><option value="open" selected>Held open</option><option value="closed">Kept closed</option></select></label>
-      <label class="f">Fire growth<select id="sim-growth"><option value="medium">Medium</option><option value="fast" selected>Fast (most buildings)</option><option value="ultrafast">Ultra-fast (high storage)</option></select></label>
-      <label class="f">Ceiling height (m)<input id="sim-ceiling" type="number" min="2" max="30" step="0.1" value="3"></label>
-    </details>
-    <div class="row">
-      <button id="sim-check" title="Run the drill many times with different people and check each room stays safe long enough">Safety check</button>
+    <div class="pick-scenario" role="group" aria-label="What happens">
+      <button data-scenario="fire" aria-pressed="true"><span aria-hidden="true">🔥</span> Fire</button>
+      <button data-scenario="earthquake" aria-pressed="false"><span aria-hidden="true">🌍</span> Earthquake</button>
     </div>
-    <div class="row">
-      <button id="sim-run" class="primary">Run drill</button>
-      <button id="sim-pick" class="fire-only" aria-pressed="false" title="Click a spot in the 3D view to start the fire there">Pick spot</button>
-      <button id="sim-worst" class="fire-only" title="Start a fire in every room and rank them">Find worst fire</button>
+    <select id="sim-scenario" hidden><option value="fire" selected>Fire</option><option value="earthquake">Earthquake</option></select>
+    <label class="f fire-only">Where does it start?<select id="sim-fire"></select></label>
+    <button id="sim-pick" class="fire-only linkish" aria-pressed="false" title="Click the floor in the 3D view where the fire starts">or click a spot on the plan</button>
+    <label class="f quake-only">How strong?<select id="sim-quake"><option value="moderate">Light: things rattle</option><option value="strong" selected>Strong: some damage</option><option value="severe">Very strong: heavy damage</option><option value="extreme">Extreme</option></select></label>
+    <label class="f">Who is inside?<select id="sim-mix"><option value="workforce" selected>Staff</option><option value="public">Visitors, the public</option><option value="care">Patients, residents</option><option value="adults">Healthy adults only</option></select></label>
+    <label class="f">How many people?<input id="sim-people" type="number" min="0" step="1" placeholder="auto"></label>
+    <details class="workspace-group" id="sim-systems"><summary>About the building</summary>
+      <label class="f">Type of building<select id="sim-use"></select></label>
+      <label class="f fire-only">Fire detectors<select id="sim-detect"><option value="smoke" selected>Smoke detectors</option><option value="heat">Heat detectors</option><option value="none">None: someone must notice</option></select></label>
+      <label class="f fire-only">Sprinklers<select id="sim-sprinklers"><option value="none" selected>No</option><option value="quick">Yes, fast</option><option value="standard">Yes, standard</option></select></label>
+      <label class="f fire-only">The alarm is<select id="sim-alarm"><option value="standard" selected>A siren</option><option value="voice">A spoken message</option></select></label>
+      <label class="f fire-only">Inside doors<select id="sim-doors"><option value="open" selected>Left open</option><option value="closed">Kept closed</option></select></label>
+      <label class="f fire-only">Fire spreads<select id="sim-growth"><option value="medium">Slowly</option><option value="fast" selected>Normally</option><option value="ultrafast">Very fast (high stacks)</option></select></label>
+      <label class="f fire-only">Ceiling height (m)<input id="sim-ceiling" type="number" min="2" max="30" step="0.1" value="3"></label>
+      <label class="f quake-only">Built with<select id="sim-building"></select></label>
+      <label class="f quake-only">Earthquake-proofing<select id="sim-design"><option value="pre">None (old building)</option><option value="low" selected>Basic</option><option value="moderate">Good</option><option value="high">Strong</option></select></label>
+      <label class="f" id="sim-stairs-row" hidden title="On an upper floor people leave by the stairs. Wheelchair users cannot use them and wait there for help.">This floor is upstairs<input id="sim-stairs" type="checkbox" style="justify-self:end;width:auto"></label>
+    </details>
+    <button id="sim-run" class="primary">Run drill</button>
+    <div class="row go-further">
+      <button id="sim-check" title="Runs the drill 20 times with different people and tells you if everyone gets out safely">Is it safe? Test 20 times</button>
+      <button id="sim-worst" class="fire-only" title="Starts a fire in every room in turn and shows the worst one">Find the worst room for a fire</button>
     </div>
     <section id="drill-guidance" aria-labelledby="rag-title" style="margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px">
-      <h2 id="rag-title">Automatic drill subtitles</h2>
-      <p>Fictional-site instructor prototype, not real emergency advice. In a real emergency follow official alarms, trained responders and your approved site procedures.</p>
-      <label><input id="rag-enable" type="checkbox"> Enable cloud inference for this drill</label>
-      <p style="font-size:12px;color:var(--muted)">Subtitles follow the simulation automatically, without AI. Optional cloud requests send the event's zone ID, scenario and source excerpts through the local server. Credentials stay on the server.</p>
+      <h2 id="rag-title">Subtitles and voice</h2>
+      <p style="font-size:12px;color:var(--muted)">A training tool, not real emergency advice. In a real emergency, follow the alarm, the emergency services and your site's procedures.</p>
+      <label><input id="rag-enable" type="checkbox"> Let AI choose the instructions (online)</label>
+      <p style="font-size:12px;color:var(--muted)">Only the room name and the event are sent, never the plan.</p>
       <div class="row" style="margin-top:8px">
 
         <button id="rag-read" disabled>Read aloud</button>
@@ -187,7 +200,7 @@
       </div>
       <p id="rag-status" role="status">Start a fire drill for automatic simulation subtitles.</p>
       <p id="rag-simulated" style="font-size:12px;color:var(--muted)"></p>
-      <details><summary>Action sources and full drill phrases</summary><ol id="rag-instructions" style="padding-left:20px;overflow-wrap:anywhere"></ol></details>
+      <details><summary>Sources</summary><ol id="rag-instructions" style="padding-left:20px;overflow-wrap:anywhere"></ol></details>
     </section>
     <div class="workspace-group">
       <p id="ext-training-status" style="font-size:12px;color:var(--muted)">Loading the fictional training station…</p>
@@ -241,12 +254,14 @@
       <div id="rag-action"></div>
       <div id="rag-citations"></div>
     </div>
+    <div id="pl-counts" class="view-only" aria-live="off"></div>
     <div id="player" class="view-only" hidden>
       <button id="pl-play" aria-label="Play">▶</button>
       <span class="clock" id="pl-clock">0:00</span>
       <input id="pl-time" type="range" min="0" max="100" step="0.1" value="0" aria-label="Time">
       <select id="pl-rate" aria-label="Playback speed" style="width:auto"><option value="1">1×</option><option value="5" selected>5×</option><option value="15">15×</option></select>
-      <span class="counts" id="pl-counts"></span>
+      <span id="pl-alarm" role="status"></span>
+      <button id="pl-sound" aria-pressed="true" aria-label="Sound" title="Sound on or off">🔊</button>
       <button id="pl-close" aria-label="Close the fire drill">✕</button>
     </div>
     <div class="hint view-only" id="orbit-hint">Drag to rotate, right-drag to pan, scroll to zoom. Click a zone to select it.</div>

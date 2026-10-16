@@ -282,7 +282,7 @@ class GuidanceTests(unittest.TestCase):
                 rejected = service.guidance(request)
                 self.assertEqual(rejected["error"], "invalid_selection")
                 self.assertEqual([a["id"] for a in rejected["actions"]], [aid])
-        chunks = json.loads((self.root / "chunks.json").read_text())
+        chunks = json.loads((self.root / "chunks.json").read_text(encoding="utf-8"))
         chunks = [c for c in chunks if c["id"] != "prefecture-earthquake"]
         (self.root / "chunks.json").write_text(json.dumps(chunks))
         self.assertEqual(service.reference()["scenarios"]["earthquake"]["actions"], [])

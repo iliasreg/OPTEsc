@@ -35,13 +35,13 @@ export const QUAKE_LEVELS = {
 // (Tables 12-3 to 12-7). Unreinforced masonry is not allowed by moderate or high codes.
 export const BUILDINGS = {
   W1: { label: 'Wood frame', collapse: 0.03, codes: { high: [0.26, 0.55, 1.28, 2.01], moderate: [0.24, 0.43, 0.91, 1.34], low: [0.2, 0.34, 0.61, 0.95], pre: [0.18, 0.29, 0.51, 0.77] } },
-  S1L: { label: 'Steel moment frame', collapse: 0.08, codes: { high: [0.19, 0.31, 0.64, 1.49], moderate: [0.15, 0.22, 0.42, 0.8], low: [0.12, 0.17, 0.3, 0.48], pre: [0.09, 0.13, 0.22, 0.38] } },
+  S1L: { label: 'Steel frame', collapse: 0.08, codes: { high: [0.19, 0.31, 0.64, 1.49], moderate: [0.15, 0.22, 0.42, 0.8], low: [0.12, 0.17, 0.3, 0.48], pre: [0.09, 0.13, 0.22, 0.38] } },
   S3: { label: 'Light metal building', collapse: 0.03, codes: { high: [0.15, 0.26, 0.54, 1.0], moderate: [0.13, 0.19, 0.33, 0.6], low: [0.1, 0.13, 0.2, 0.38], pre: [0.08, 0.1, 0.16, 0.3] } },
-  C1L: { label: 'Concrete moment frame', collapse: 0.13, codes: { high: [0.21, 0.35, 0.7, 1.37], moderate: [0.16, 0.23, 0.41, 0.77], low: [0.12, 0.15, 0.27, 0.45], pre: [0.1, 0.12, 0.21, 0.36] } },
-  C2L: { label: 'Concrete shear walls', collapse: 0.13, codes: { high: [0.24, 0.45, 0.9, 1.55], moderate: [0.18, 0.3, 0.49, 0.87], low: [0.14, 0.19, 0.3, 0.52], pre: [0.11, 0.15, 0.24, 0.42] } },
-  PC1: { label: 'Precast concrete tilt-up', collapse: 0.15, codes: { high: [0.2, 0.35, 0.72, 1.25], moderate: [0.18, 0.24, 0.44, 0.71], low: [0.13, 0.17, 0.25, 0.45], pre: [0.11, 0.14, 0.21, 0.35] } },
-  RM1L: { label: 'Reinforced masonry', collapse: 0.13, codes: { high: [0.3, 0.46, 0.93, 1.57], moderate: [0.22, 0.3, 0.5, 0.85], low: [0.16, 0.2, 0.29, 0.54], pre: [0.13, 0.16, 0.24, 0.43] } },
-  URML: { label: 'Unreinforced masonry', collapse: 0.15, codes: { low: [0.14, 0.2, 0.32, 0.46], pre: [0.13, 0.17, 0.26, 0.37] } },
+  C1L: { label: 'Concrete frame', collapse: 0.13, codes: { high: [0.21, 0.35, 0.7, 1.37], moderate: [0.16, 0.23, 0.41, 0.77], low: [0.12, 0.15, 0.27, 0.45], pre: [0.1, 0.12, 0.21, 0.36] } },
+  C2L: { label: 'Concrete walls', collapse: 0.13, codes: { high: [0.24, 0.45, 0.9, 1.55], moderate: [0.18, 0.3, 0.49, 0.87], low: [0.14, 0.19, 0.3, 0.52], pre: [0.11, 0.15, 0.24, 0.42] } },
+  PC1: { label: 'Precast concrete panels', collapse: 0.15, codes: { high: [0.2, 0.35, 0.72, 1.25], moderate: [0.18, 0.24, 0.44, 0.71], low: [0.13, 0.17, 0.25, 0.45], pre: [0.11, 0.14, 0.21, 0.35] } },
+  RM1L: { label: 'Brick or block, reinforced', collapse: 0.13, codes: { high: [0.3, 0.46, 0.93, 1.57], moderate: [0.22, 0.3, 0.5, 0.85], low: [0.16, 0.2, 0.29, 0.54], pre: [0.13, 0.16, 0.24, 0.43] } },
+  URML: { label: 'Old brick or stone', collapse: 0.15, codes: { low: [0.14, 0.2, 0.32, 0.46], pre: [0.13, 0.17, 0.26, 0.37] } },
 };
 export const DAMAGE_STATES = ['none', 'slight', 'moderate', 'extensive', 'complete'];
 export const HAZUS_BETA = 0.64;

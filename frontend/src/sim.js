@@ -58,7 +58,7 @@ export const SIM_DEFAULTS = {
   quakeLevel: 'strong', // QUAKE_LEVELS in quake.js
   building: 'C1L', // HAZUS building type (quake.js BUILDINGS)
   design: 'low', // seismic design level: 'pre', 'low', 'moderate', 'high'
-  exposure: { debris: 5, sheltered: 0.3, running: 2 }, // relative injury risk (assumed, see below)
+  exposure: { sheltered: 0.3, running: 2 }, // relative injury risk away from falling elements (assumed, see below)
   coverShare: 0.65, // share of walkers who take cover until the shaking stops; the rest run
   wallHeight: 2.6, // m, for how far falling walls reach
   fireModel: 'zone', // 'zone' (two-zone, firemodel.js) or 'grid' (legacy fronts)
@@ -84,7 +84,7 @@ export const SIM_DEFAULTS = {
 export const PROFILES = {
   adult: { label: 'Adults', speed: null, pre: 1, space: 1, stairs: true, rubble: true },
   older: { label: 'Older people', speed: [0.8, 1.2], pre: 1.3, space: 1, stairs: true, rubble: true },
-  aid: { label: 'Walking aid', speed: [0.5, 0.95], pre: 1.5, space: 1.5, stairs: true, rubble: false },
+  aid: { label: 'People with a walking aid', speed: [0.5, 0.95], pre: 1.5, space: 1.5, stairs: true, rubble: false },
   wheelchair: { label: 'Wheelchair users', speed: [0.6, 0.9], pre: 1.5, space: 2.5, stairs: false, rubble: false, minDoor: 0.75 },
 };
 // Typical mixes: a working site, a building open to the public, a care home or hospital ward.
@@ -100,10 +100,10 @@ export const MIXES = {
 export const OCCUPANCY = {
   office: { label: 'Offices, factories, warehouses', origin: 30, remote: 60, familiar: true },
   retail: { label: 'Shops, restaurants, exhibitions', origin: 60, remote: 120, voice: [30, 60], familiar: false },
-  hotel: { label: 'Hotels (asleep, unfamiliar)', origin: 60, remote: 600, voice: [60, 300], familiar: false },
-  apartment: { label: 'Apartments (asleep)', origin: 60, remote: 300, familiar: true },
-  clinic: { label: 'Clinics, day care (staff help)', origin: 60, remote: 120, familiar: false },
-  care: { label: 'Hospitals, care homes (asleep, staff help)', origin: 180, remote: 1800, familiar: false },
+  hotel: { label: 'Hotels (guests asleep)', origin: 60, remote: 600, voice: [60, 300], familiar: false },
+  apartment: { label: 'Apartments (people asleep)', origin: 60, remote: 300, familiar: true },
+  clinic: { label: 'Clinics, day care', origin: 60, remote: 120, familiar: false },
+  care: { label: 'Hospitals, care homes', origin: 180, remote: 1800, familiar: false },
 };
 
 // People per m2 by room type. Factory figures from typical staffing (one person per 20 to
@@ -117,7 +117,18 @@ export const DENSITY = {
 
 const K = { OUTSIDE: 0, FLOOR: 1, WALL: 2, DOOR: 3, EXIT: 4, WINDOW: 5, OBSTACLE: 6, STAIR: 7 };
 const KIND_OF = { o: 0, '.': 1, '#': 2, D: 3, E: 4, W: 5 };
-export const STATE = { WAITING: 0, MOVING: 1, OUT: 2, OVERCOME: 3, TRAPPED: 4, ASSIST: 5, INJURED: 6 };
+export const STATE = { WAITING: 0, MOVING: 1, OUT: 2, OVERCOME: 3, TRAPPED: 4, ASSIST: 5, INJURED: 6, KILLED: 7 };
+
+// Someone a falling wall panel or a toppling piece of furniture lands on: shares of severity 1
+// to 4 (treated and released, hospital, life-threatening, dead). Assumed: HAZUS gives rates for
+// the whole building, not for each falling element. Cover under a sturdy table shifts them to
+// the lighter end. Impact comes when the element reaches the floor (quakeview.js draws the fall).
+export const HIT_SEVERITY = {
+  wall: [0.2, 0.3, 0.25, 0.25],
+  topple: [0.55, 0.3, 0.1, 0.05],
+  sheltered: [0.6, 0.3, 0.08, 0.02],
+};
+const IMPACT_S = { wall: 1.0, topple: 0.8 };
 
 // The grid, zones and doors of a site in the form the simulation uses.
 export function prepare(site, opts = {}) {
@@ -530,32 +541,39 @@ export function simulate(site, opts = {}) {
   const hurt = rng(o.seed * 9173 + 5);
   const injuredBy = new Uint8Array(N); // 1 falling wall, 2 falling furniture, 3 shaking
   // Earthquake casualties (HAZUS indoor casualty rates for the building's damage state): the
-  // expected number at each severity is the rate times the number of people inside; who they
-  // are is drawn by exposure: much more likely under falling rubble, less likely sheltering
-  // under a table, more likely for those on the move during the shaking. These relative
-  // weights are assumptions; the totals stay those of HAZUS. Severity 1 (treated and released)
-  // slows people down; 2 to 4 (hospital, life-threatening, dead) leave them unable to move.
+  // expected number at each severity is the rate times the number of people inside. Whoever is
+  // under a wall or a piece of furniture when it lands is hit (HIT_SEVERITY), wherever they
+  // walked to by then. The rest of the HAZUS count, less the hits expected where people stand
+  // at the start, falls on the others by exposure: less likely sheltering under a table, more
+  // likely for those on the move during the shaking (assumed weights). Severity 1 (treated and
+  // released) slows people down; 2 and 3 leave them unable to move; 4 is dead.
   const severity = new Uint8Array(N), hurtAt = new Float32Array(N).fill(Infinity), slowed = new Float32Array(N).fill(1);
+  const hitShares = (type, k, i) => (covering[k] && sheltered[i] ? HIT_SEVERITY.sheltered : HIT_SEVERITY[type === 'wall' ? 'wall' : 'topple']);
+  const drawSeverity = (shares) => { let u = hurt(); for (let s = 4; s >= 1; s--) { if (u < shares[s - 1]) return s; u -= shares[s - 1]; } return 1; };
   if (quake) {
     const rates = casualtyRates(o.building, dmg.quake.damage, dmg.quake.collapsed);
-    const hitAt = new Map(); // cell -> when something falls on it, and what
+    const hitAt = new Map(); // cell -> what falls on it first
     for (const ev of dmg.events) if (ev.type !== 'door') for (const i of ev.cells) if (!hitAt.has(i)) hitAt.set(i, ev);
-    const wt = people.map((p, k) => {
-      const i = cellOf(p.x, p.y);
-      return (hitAt.has(i) ? o.exposure.debris : 1) * (covering[k] ? (sheltered[i] ? o.exposure.sheltered : 1) : o.exposure.running);
-    });
-    const sumW = wt.reduce((a, b) => a + b, 0) || 1;
+    const expectedHits = [0, 0, 0, 0], others = [];
     people.forEach((p, k) => {
-      const f = (wt[k] * N) / sumW;
+      const i = cellOf(p.x, p.y), ev = hitAt.get(i);
+      if (ev) hitShares(ev.type, k, i).forEach((s, j) => { expectedHits[j] += s; });
+      else others.push(k);
+    });
+    const left = rates.map((r, j) => Math.max(0, r * N - expectedHits[j]));
+    const wt = others.map((k) => (covering[k] ? (sheltered[cellOf(people[k].x, people[k].y)] ? o.exposure.sheltered : 1) : o.exposure.running));
+    const sumW = wt.reduce((a, b) => a + b, 0) || 1;
+    others.forEach((k, n) => {
       let u = hurt(), sev = 0;
-      for (let s = 4; s >= 1 && !sev; s--) { const ps = Math.min(1, rates[s - 1] * f); if (u < ps) sev = s; else u -= ps; }
+      for (let s = 4; s >= 1 && !sev; s--) { const ps = Math.min(1, (left[s - 1] * wt[n]) / sumW); if (u < ps) sev = s; else u -= ps; }
       if (!sev) return;
       severity[k] = sev;
-      const ev = hitAt.get(cellOf(p.x, p.y));
-      hurtAt[k] = ev ? ev.t : dmg.quake.duration * (0.15 + 0.5 * hurt());
-      injuredBy[k] = ev ? (ev.type === 'wall' ? 1 : 2) : 3;
+      hurtAt[k] = dmg.quake.duration * (0.15 + 0.5 * hurt());
+      injuredBy[k] = 3;
     });
   }
+  const impacts = []; // walls and furniture on their way down: when they land, and where
+  const hits = []; // who they landed on
   function cellOf(x, y) { return Math.min(h - 1, Math.max(0, Math.floor(y / c))) * w + Math.min(w - 1, Math.max(0, Math.floor(x / c))); }
 
   // door capacity: specific flow over the effective width (C/VM2 eq. 3.4: 1.32 people/s/m at
@@ -696,13 +714,31 @@ export function simulate(site, opts = {}) {
     while (nextEvent < events.length && events[nextEvent].t <= t + 1e-9) {
       const ev = events[nextEvent++];
       changed = true;
+      if (ev.type !== 'door') impacts.push({ at: ev.t + (IMPACT_S[ev.type] ?? 1), type: ev.type, id: ev.id, zones: ev.zones, cells: new Set(ev.cells) });
+    }
+    // what lands now hits everyone still inside under it
+    for (let n = impacts.length - 1; n >= 0; n--) {
+      const im = impacts[n];
+      if (im.at > t + 1e-9) continue;
+      impacts.splice(n, 1);
+      let hit = 0, dead = 0;
+      for (let k = 0; k < N; k++) {
+        if (state[k] !== STATE.WAITING && state[k] !== STATE.MOVING && state[k] !== STATE.ASSIST) continue;
+        const i = cellOf(px[k], py[k]);
+        if (!im.cells.has(i)) continue;
+        const sev = drawSeverity(hitShares(im.type, k, i));
+        if (sev >= severity[k]) { severity[k] = sev; injuredBy[k] = im.type === 'wall' ? 1 : 2; }
+        hurtAt[k] = Math.min(hurtAt[k], t);
+        hit++; if (severity[k] === 4) dead++;
+      }
+      if (hit) hits.push({ t: round1(t), type: im.type, id: im.id, zones: im.zones, people: hit, killed: dead });
     }
     // casualties as they happen (people already outside are spared)
     if (quake) for (let k = 0; k < N; k++) {
-      if (!severity[k] || hurtAt[k] > t + 1e-9 || state[k] === STATE.OUT || state[k] === STATE.OVERCOME || state[k] === STATE.INJURED) continue;
+      if (!severity[k] || hurtAt[k] > t + 1e-9 || state[k] === STATE.OUT || state[k] === STATE.OVERCOME || state[k] === STATE.INJURED || state[k] === STATE.KILLED) continue;
       if (severity[k] === 1) { slowed[k] = 0.7; continue; }
       if (state[k] !== STATE.ASSIST) active--;
-      state[k] = STATE.INJURED; outAt[k] = t;
+      state[k] = severity[k] === 4 ? STATE.KILLED : STATE.INJURED; outAt[k] = t;
     }
     // with no smoke (an earthquake) the ways out only change when something falls
     // routes are only needed while someone is on the move (in a hotel at night nobody moves
@@ -821,7 +857,7 @@ export function simulate(site, opts = {}) {
     for (let d = 0; d < doorQueue.length; d++) if (doorQueue[d] > doorMaxQ[d]) doorMaxQ[d] = doorQueue[d];
     if (!active) break;
     // earthquake, no smoke: once everyone left is shut in and nothing more will fall, nothing changes
-    if (quake && stuck >= active && nextEvent >= events.length) break;
+    if (quake && stuck >= active && nextEvent >= events.length && !impacts.length) break;
   }
   if (frames[frames.length - 1] !== t) record();
   for (let k = 0; k < N; k++) if (state[k] <= STATE.MOVING) state[k] = STATE.TRAPPED;
@@ -843,10 +879,10 @@ export function simulate(site, opts = {}) {
   const metrics = summarise(g, hz, people, { state, outAt, dose, waited, walked, exitUsed, doorCount, doorWait, doorMaxQ, viaStairs, helpBy, injuredBy, covering, quake: dmg, fedCO, fedHeat, overLimit, lastIn, warned, severity, t, o });
   return {
     fire: quake || o.scenario === 'none' ? null : { cell: start, x: ((start % w) + 0.5) * c, y: (((start / w) | 0) + 0.5) * c, zone: g.zoneByK.get(zoneFire)?.id || null },
-    quake: dmg && { ...dmg.quake, panels: dmg.panels.filter((p) => p.t != null), topples: dmg.topples, events: dmg.events },
+    quake: dmg && { ...dmg.quake, panels: dmg.panels.filter((p) => p.t != null), topples: dmg.topples, events: dmg.events, hits },
     hazard: hz,
     fireModel: zoneModel ? { alarm: hz.zone.alarm, warned, sprinkler: hz.zone.sprinklerAt, flashover: hz.zone.flashoverAt, Q: hz.zone.Q, aset: hz.aset } : null,
-    people: people.map((p, k) => ({ zone: p.zone, profile: p.profile || 'adult', start: [p.x, p.y], pre: pre[k], speed: p.speed, state: state[k], out_s: outAt[k], dose: dose[k] })),
+    people: people.map((p, k) => ({ zone: p.zone, profile: p.profile || 'adult', start: [p.x, p.y], pre: pre[k], speed: p.speed, state: state[k], out_s: outAt[k], dose: dose[k], severity: severity[k] })),
     frames: { every: o.frameEvery, times: frames, pos: fPos, state: fState },
     metrics,
     params: { ...o, placed: undefined },
@@ -856,7 +892,7 @@ export function simulate(site, opts = {}) {
 function summarise(g, hz, people, r) {
   const N = people.length;
   const out = [], byZone = new Map();
-  let overcome = 0, trapped = 0, assist = 0, injured = 0, maxDose = 0;
+  let overcome = 0, trapped = 0, assist = 0, injured = 0, killed = 0, maxDose = 0;
   const byProfile = {};
   for (let k = 0; k < N; k++) {
     if (r.state[k] === STATE.OUT) out.push(r.outAt[k]);
@@ -864,13 +900,15 @@ function summarise(g, hz, people, r) {
     if (r.state[k] === STATE.TRAPPED) trapped++;
     if (r.state[k] === STATE.ASSIST) assist++;
     if (r.state[k] === STATE.INJURED) injured++;
-    const pf = (byProfile[people[k].profile || 'adult'] ??= { people: 0, out: 0, overcome: 0, trapped: 0, assist: 0, injured: 0, last_out_s: null });
+    if (r.state[k] === STATE.KILLED) killed++;
+    const pf = (byProfile[people[k].profile || 'adult'] ??= { people: 0, out: 0, overcome: 0, trapped: 0, assist: 0, injured: 0, killed: 0, last_out_s: null });
     pf.people++;
     if (r.state[k] === STATE.OUT) { pf.out++; pf.last_out_s = round1(Math.max(pf.last_out_s ?? 0, r.outAt[k])); }
     if (r.state[k] === STATE.OVERCOME) pf.overcome++;
     if (r.state[k] === STATE.TRAPPED) pf.trapped++;
     if (r.state[k] === STATE.ASSIST) pf.assist++;
     if (r.state[k] === STATE.INJURED) pf.injured++;
+    if (r.state[k] === STATE.KILLED) pf.killed++;
     maxDose = Math.max(maxDose, r.dose[k]);
     const z = people[k].zone;
     if (!byZone.has(z)) byZone.set(z, { people: 0, out: 0, overcome: 0, trapped: 0, last_out_s: 0 });
@@ -918,7 +956,8 @@ function summarise(g, hz, people, r) {
     trapped,
     assist, // waiting for help at a stair landing
     help_by_s: r.helpBy == null ? null : round1(r.helpBy), // the first of them is overcome then without help
-    injured, // hit by a falling wall or piece of furniture
+    injured, // hurt too badly to move (falling wall, furniture, or a fall)
+    killed,
     over_limit: r.overLimit ? r.overLimit.reduce((a, b) => a + b, 0) : 0, // exposed past FED 0.3
     fire: hz.kind === 'zone' ? {
       alarm_s: hz.zone.alarm == null ? null : round1(hz.zone.alarm),
@@ -989,7 +1028,7 @@ export function assess(site, opts = {}, runs = 20, onProgress = null) {
     const v = xs.filter((x) => x != null).sort((a, b) => a - b);
     return v.length ? v[Math.min(v.length - 1, Math.ceil(p * v.length) - 1)] : null;
   };
-  const harmed = all.map((m) => m.overcome + m.trapped + m.assist + (m.injured || 0));
+  const harmed = all.map((m) => m.overcome + m.trapped + m.assist + (m.injured || 0) + (m.killed || 0));
   // a run where someone never got out has no evacuation time: it counts as the worst
   const evac = all.map((m) => (m.all_out_s == null ? Infinity : m.all_out_s));
   const rooms = g.zones.map((z, k) => {
@@ -1014,7 +1053,7 @@ export function assess(site, opts = {}, runs = 20, onProgress = null) {
     people: all[0].people,
     fire: all[0].fire,
     // who did not get out, per run on average, by profile and outcome; and doors a wheelchair cannot pass
-    profiles: Object.fromEntries(Object.keys(PROFILES).map((p) => [p, ['people', 'out', 'overcome', 'trapped', 'assist', 'injured'].reduce((t, key) => {
+    profiles: Object.fromEntries(Object.keys(PROFILES).map((p) => [p, ['people', 'out', 'overcome', 'trapped', 'assist', 'injured', 'killed'].reduce((t, key) => {
       t[key] = Math.round((all.reduce((a, m) => a + (m.profiles[p]?.[key] || 0), 0) / runs) * 10) / 10;
       return t;
     }, {})]).filter(([, v]) => v.people > 0)),

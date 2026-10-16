@@ -53,59 +53,82 @@ export function drillEvents(result, site) {
 // source-backed actions: 'alarm', 'smoke', 'blocked_route'.
 function zoneEvents(result, site) {
   const hz = result.hazard, fm = result.fireModel || {}, events = [];
-  const room = (id) => { const z = site.zones.find((z) => z.id === id); return z ? `${z.name} (${z.id})` : id; };
+  const room = (id) => site.zones.find((z) => z.id === id)?.name || id;
   const add = (time, id, scenario, zoneId, fact, doorId = null) => {
     if (Number.isFinite(time)) events.push({ time: Math.max(0, time), id, scenario, zoneId, fact, zoneIds: !doorId && zoneId ? [zoneId] : [], doorIds: doorId ? [doorId] : [] });
   };
   const origin = result.fire?.zone;
-  const kw = (t) => Math.round(hz.zone.Q[Math.max(0, Math.min(hz.zone.Q.length - 1, Math.floor(t)))]);
-  add(0, 'alarm', 'alarm', origin, `Fire starts in ${origin ? room(origin) : 'the picked spot'} (design fire, growing as t²).`);
-  const how = { smoke: 'Smoke detectors', heat: 'Heat detectors', none: 'Someone' }[hz.zone.opts.detection] || 'Detectors';
-  if (fm.alarm != null) add(fm.alarm, 'detected', 'alarm', origin, `${fm.sprinkler === fm.alarm ? 'A sprinkler flow switch' : how} raise${how === 'Someone' ? 's' : ''} the alarm: the fire is about ${kw(fm.alarm)} kW.`);
-  if (fm.warned != null && Number.isFinite(fm.warned)) add(fm.warned, 'warned', 'alarm', origin, 'The alarm sounds through the building: everyone is warned.');
-  if (fm.sprinkler != null) add(fm.sprinkler, 'sprinkler', 'alarm', origin, `A sprinkler opens above the fire and holds it at about ${kw(fm.sprinkler)} kW.`);
-  if (fm.flashover != null) add(fm.flashover, 'flashover', 'blocked_route', origin, `Flashover in ${room(origin)}: the whole room is on fire.`);
-  const why = { visibility: 'smoke too thick to see 10 m', 'toxic gases': 'toxic gas dose over the limit', heat: 'heat dose over the limit', 'radiant heat': 'radiant heat from the smoke layer', flashover: 'flashover' };
+  add(0, 'alarm', 'alarm', origin, `A fire starts in ${origin ? room(origin) : 'the building'}. Nobody has noticed yet.`);
+  if (fm.alarm != null) {
+    const how = fm.sprinkler === fm.alarm ? 'The sprinkler system sets off the alarm.'
+      : { smoke: 'The smoke detectors go off.', heat: 'The heat detectors go off.', none: 'Someone sees the fire and raises the alarm.' }[hz.zone.opts.detection] || 'The fire is detected.';
+    add(fm.alarm, 'detected', 'alarm', origin, how);
+  }
+  if (fm.warned != null && Number.isFinite(fm.warned)) add(fm.warned, 'warned', 'alarm', origin, 'The alarm rings through the building. People stop, look around, and start to leave.');
+  const m = result.metrics || {};
+  if (m.all_out_s != null) add(m.all_out_s, 'all-out', 'alarm', null, `Everyone is out: ${m.people} people in ${clock(m.all_out_s)}.`);
+  if (fm.sprinkler != null) add(fm.sprinkler, 'sprinkler', 'alarm', origin, 'A sprinkler opens above the fire and stops it from growing.');
+  if (fm.flashover != null) add(fm.flashover, 'flashover', 'blocked_route', origin, `All of ${room(origin)} is now on fire.`);
+  const why = { visibility: 'the smoke is too thick to see the way out', 'toxic gases': 'the smoke is poisonous to breathe', heat: 'it is too hot', 'radiant heat': 'the heat from the smoke above is too strong', flashover: 'it is on fire' };
   (fm.aset || hz.aset || []).forEach((a, k) => {
     const id = site.zones[k]?.id;
     if (!id) return;
-    if (a.layerBelow2m != null) add(a.layerBelow2m, `smoke:${id}`, 'smoke', id, `Smoke comes down below head height (2 m) in ${room(id)}.`);
-    if (a.aset != null) add(a.aset, `untenable:${id}`, 'smoke', id, `${room(id)} is no longer tenable: ${why[a.cause] || a.cause}.`);
+    if (a.layerBelow2m != null) add(a.layerBelow2m, `smoke:${id}`, 'smoke', id, `Smoke in ${room(id)} comes down to head height.`);
+    if (a.aset != null) add(a.aset, `untenable:${id}`, 'smoke', id, `${room(id)} is now too dangerous to be in: ${why[a.cause] || a.cause}.`);
   });
   const { grid } = site;
   for (const d of site.doors) {
     const cells = (d.cells || []).filter(([x, y]) => x >= 0 && y >= 0 && x < grid.w && y < grid.h && ['D', 'E'].includes(grid.cells[y][x]));
     if (!cells.length) continue;
     const time = Math.max(...cells.map(([x, y]) => hz.fireT[y * grid.w + x] - 2));
-    const ends = (d.connects || []).map((id) => (id === 'outside' ? 'outside' : room(id))).join(' / ');
-    add(time, `door:${d.id}`, 'blocked_route', (d.connects || []).find((id) => site.zones.some((z) => z.id === id)), `${d.is_exit ? 'Exit' : 'Door'} ${d.id}${ends ? ` (${ends})` : ''} is cut off by the fire.`, d.id);
+    add(time, `door:${d.id}`, 'blocked_route', (d.connects || []).find((id) => site.zones.some((z) => z.id === id)), `The fire blocks ${doorLabel(d, room)}.`, d.id);
   }
   events.sort((a, b) => a.time - b.time || (a.id === 'alarm' ? -1 : b.id === 'alarm' ? 1 : a.id.localeCompare(b.id)));
   return events;
 }
 
-// Earthquake facts: the shaking, each wall that comes down, jammed doors, toppled furniture.
-// Phase changes bypass subtitle holds so renewed shaking cannot retain evacuation guidance.
+const clock = (s) => { const r = Math.round(s); return r < 60 ? `${r} seconds` : `${Math.floor(r / 60)} min ${String(r % 60).padStart(2, '0')} s`; };
+// "the exit from the canteen (D9)", "the door between the office and the corridor (D4)"
+function doorLabel(d, room) {
+  const ends = (d.connects || []).filter((id) => id !== 'outside').map(room);
+  return d.is_exit ? `the exit from ${ends[0] || 'the building'} (${d.id})` : ends.length > 1 ? `the door between ${ends.join(' and ')} (${d.id})` : `door ${d.id}`;
+}
+
+// Earthquake facts: the shaking, each wall that comes down and who it lands on, jammed doors,
+// toppled furniture. Phase changes bypass subtitle holds so renewed shaking cannot retain
+// evacuation guidance.
 function quakeEvents(result, site) {
   const q = result.quake, events = [];
-  const room = (id) => { const z = site.zones.find((z) => z.id === id); return z ? `${z.name} (${z.id})` : id; };
+  const room = (id) => site.zones.find((z) => z.id === id)?.name || id;
   const rooms = (ids) => ids.map(room).join(' and ');
   const phaseAt = time => q.aftershock && time >= q.aftershock.t && time < q.aftershock.t + q.aftershock.duration*1.3
     ? 'earthquake_aftershock' : time < q.duration*1.3 ? 'earthquake' : 'earthquake_after';
   const add = (time, id, fact, zoneIds = [], doorIds = [], quakePhase = false) => events.push({ time, id, scenario: phaseAt(time), zoneId: zoneIds[0] || site.zones[0]?.id || null, fact, zoneIds, doorIds, quakePhase });
-  add(0, 'alarm', `${q.label} earthquake: strong shaking lasts about ${q.duration} s, followed by a simulated fade (peak ${q.pga.toFixed(2)} g).`, [], [], true);
-  add(q.duration*1.3, 'shake-end', 'The simulated shaking has ended. This does not establish that the building or exits are safe.', [], [], true);
+  const strength = { moderate: 'A light', strong: 'A strong', severe: 'A very strong', extreme: 'An extreme' }[q.level] || `A ${String(q.label || '').toLowerCase()}`;
+  add(0, 'alarm', `${strength} earthquake: the ground shakes for about ${q.duration} seconds. Most people drop, take cover and hold on.`, [], [], true);
+  add(q.duration*1.3, 'shake-end', 'The shaking stops. People who took cover get up and leave. The building may still be unsafe.', [], [], true);
   if (q.aftershock) {
-    add(q.aftershock.t, 'aftershock', `Aftershock (peak ${q.aftershock.pga.toFixed(2)} g) while people are leaving.`, [], [], true);
-    add(q.aftershock.t+q.aftershock.duration*1.3, 'aftershock-end', 'The simulated aftershock has ended. Further shocks and falling debris remain possible.', [], [], true);
+    add(q.aftershock.t, 'aftershock', 'An aftershock shakes the building again while people are leaving.', [], [], true);
+    add(q.aftershock.t+q.aftershock.duration*1.3, 'aftershock-end', 'The aftershock is over. More shocks and falling debris are still possible.', [], [], true);
   }
+  const where = (e) => (e.zones.length ? ` in ${rooms(e.zones)}` : '');
+  const hitBy = new Map((q.hits || []).map((h) => [`${h.type}:${h.id}`, h]));
+  const caught = (h) => {
+    if (!h) return '';
+    const who = h.people === 1 ? 'someone' : `${h.people} people`;
+    if (!h.killed) return ` It falls on ${who}.`;
+    if (h.people === 1) return ' It falls on someone, who does not survive.';
+    return ` It falls on ${who}; ${h.killed === h.people ? 'none of them survive' : `${h.killed} of them do not survive`}.`;
+  };
   for (const e of q.events) {
-    if (e.type === 'wall') add(e.t, `wall:${e.id}`, `A wall collapses${e.zones.length ? ` in ${rooms(e.zones)}` : ''}. Rubble blocks part of the floor.`, e.zones);
+    if (e.type === 'wall') add(e.t, `wall:${e.id}`, `A wall collapses${where(e)}.${caught(hitBy.get(`wall:${e.id}`))}`, e.zones);
     else if (e.type === 'door') {
       const d = site.doors.find((x) => x.id === e.id);
-      add(e.t, `door:${e.id}`, `${d?.is_exit ? 'Exit' : 'Door'} ${e.id} is jammed shut by the shaking.`, [], [e.id]);
-    } else if (e.type === 'topple') add(e.t, `topple:${e.id}`, `Tall furniture overturns${e.zones.length ? ` in ${rooms(e.zones)}` : ''}.`, e.zones);
+      add(e.t, `door:${e.id}`, `The shaking jams ${d ? doorLabel(d, room) : `door ${e.id}`}. It will not open.`, [], [e.id]);
+    } else if (e.type === 'topple') add(e.t, `topple:${e.id}`, `A tall cupboard or shelf falls over${where(e)}.${caught(hitBy.get(`topple:${e.id}`))}`, e.zones);
   }
+  const m = result.metrics || {};
+  if (m.all_out_s != null) add(m.all_out_s, 'all-out', `Everyone is out: ${m.people} people in ${clock(m.all_out_s)}.`);
   events.sort((a, b) => a.time - b.time || (a.id === 'alarm' ? -1 : b.id === 'alarm' ? 1 : a.id.localeCompare(b.id)));
   return events;
 }

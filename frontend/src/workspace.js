@@ -2,7 +2,7 @@ const $ = (s) => document.querySelector(s);
 const body = document.body, oldAside = $('aside');
 const toolbar = document.createElement('header');
 toolbar.id = 'workspace-toolbar';
-toolbar.innerHTML = '<div class="workspace-brand">OPTEsc <span>Drill workspace</span></div><span class="workspace-notice">Software drill · not emergency guidance</span><nav aria-label="Workspace panels"><button data-panel="setup">Setup</button><button data-panel="details">Details</button><button data-panel="view">View</button></nav>';
+toolbar.innerHTML = '<div class="workspace-brand">OPTEsc <span>Drill workspace</span></div><span class="workspace-notice">Software drill · not emergency guidance</span><nav aria-label="Workspace panels"><button data-panel="setup">Setup</button><button data-panel="details">Results</button><button data-panel="view">View</button></nav>';
 body.prepend(toolbar);
 const panel = document.createElement('aside'); panel.id='workspace-panel';
 panel.innerHTML='<div class="workspace-panel-head"><h1 id="workspace-panel-title">Setup</h1><button id="workspace-close" aria-label="Close panel">×</button></div>';
@@ -16,23 +16,23 @@ const stats=$('#stats').closest('section'), issues=$('#issues').closest('section
 const originalBar=$('#main > .bar');
 toolbar.append($('#sim-run'));
 sections.setup.append(simulation);
-sections.setup.append(group('Building & import',[upload,scale],false));
-sections.setup.append(group('Guidance & audio',[guidance],false));
-sections.details.append(group('Building checks',[stats,issues],true));
-sections.details.append(group('Drill results',[results],false));
+sections.setup.append(group('Your plan',[upload,scale],false));
+sections.setup.append(group('Subtitles and voice',[guidance],false));
+sections.details.append(group('Drill results',[results],true));
+sections.details.append(group('Plan checks',[stats,issues],false));
 sections.details.append(group('Rooms & measurements',[zones],false));
 sections.details.append(group('Export',[exports],false));
-const sources=document.createElement('p');sources.className='workspace-source-note';sources.textContent='Source references remain beneath the scene subtitles. Open Setup → Guidance & audio for full citations and optional speech.';sections.details.append(sources);
+const sources=document.createElement('p');sources.className='workspace-source-note';sources.textContent='Source references remain beneath the scene subtitles. Open Setup → Subtitles and voice for sources and speech.';sections.details.append(sources);
 sections.view.append(originalBar);
 const legend=$('.legend');if(legend)sections.view.append(legend);
 const status=$('#status');status.id='status';toolbar.append(status);
 oldAside.remove();
 let currentPanel=null;
-function showPanel(name){currentPanel=name;body.dataset.panel=name||'';panel.hidden=!name;for(const [id,e] of Object.entries(sections))e.hidden=id!==name;$('#workspace-panel-title').textContent=({setup:'Drill setup',details:'Details & results',view:'View & edit'})[name]||'Workspace';toolbar.querySelectorAll('[data-panel]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.panel===name)));window.dispatchEvent(new Event('resize'));window.optesc?.viewer?._resize()}
+function showPanel(name){currentPanel=name;body.dataset.panel=name||'';panel.hidden=!name;for(const [id,e] of Object.entries(sections))e.hidden=id!==name;$('#workspace-panel-title').textContent=({setup:'Drill setup',details:'Results',view:'View & edit'})[name]||'Workspace';toolbar.querySelectorAll('[data-panel]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.panel===name)));window.dispatchEvent(new Event('resize'));window.optesc?.viewer?._resize()}
 toolbar.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>showPanel(currentPanel===b.dataset.panel?null:b.dataset.panel)));
 $('#workspace-close').addEventListener('click',()=>showPanel(null));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&currentPanel)showPanel(null)});
 // Keep mandatory warnings available; only their location changes.
-$('#sim-worst').closest('.row').classList.add('workspace-extra-run');
-const advanced=group('Advanced drill controls',[$('#sim-pick'),$('#sim-worst')],false);advanced.classList.add('fire-only');simulation.insertBefore(advanced,simulation.firstElementChild.nextSibling);
+// The extinguisher training note sits out of the way until wanted.
+const ext=$('#ext-training-status')?.closest('.workspace-group');if(ext){ext.remove();sections.setup.append(group('Extinguisher training',[...ext.childNodes],false));}
 showPanel('setup');

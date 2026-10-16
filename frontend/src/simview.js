@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { smokeAt, STATE } from './sim.js';
 import { projectionPlan, projectionDoorKind, projectionCellClear, quakeProjectionShaking } from './drillevents.js';
 
-export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b' };
+export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b', killed: '#4a1520' };
 const STATE_COLOR = {
   [STATE.WAITING]: new THREE.Color(PEOPLE_COLORS.waiting),
   [STATE.MOVING]: new THREE.Color(PEOPLE_COLORS.moving),
@@ -12,6 +12,7 @@ const STATE_COLOR = {
   [STATE.TRAPPED]: new THREE.Color(PEOPLE_COLORS.trapped),
   [STATE.ASSIST]: new THREE.Color(PEOPLE_COLORS.assist),
   [STATE.INJURED]: new THREE.Color(PEOPLE_COLORS.injured),
+  [STATE.KILLED]: new THREE.Color(PEOPLE_COLORS.killed),
 };
 
 // One figure per profile, feet at the origin, facing +x.
@@ -129,6 +130,25 @@ export class SimLayer {
       this.group.add(mesh);
     }
 
+    // when each person sets off (first frame on the move): a mark pops up over their head
+    this.startAt = new Float32Array(N).fill(Infinity);
+    const { times, state: fs } = result.frames;
+    for (let f = 0; f < times.length; f++) for (let k = 0; k < N; k++) {
+      if (this.startAt[k] === Infinity && (fs[f][k] === STATE.MOVING || fs[f][k] === STATE.OUT)) this.startAt[k] = times[f];
+    }
+    const mark = new THREE.ConeGeometry(0.13, 0.32, 8);
+    mark.rotateX(Math.PI);
+    this.marks = new THREE.InstancedMesh(mark, new THREE.MeshBasicMaterial({ color: '#ffd43b' }), N);
+    this.marks.frustumCulled = false;
+    // a ring round each casualty, seen from far off and over rubble
+    const halo = new THREE.RingGeometry(0.5, 0.68, 24);
+    halo.rotateX(-Math.PI / 2);
+    this.rings = new THREE.InstancedMesh(halo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }), N);
+    this.rings.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3);
+    this.rings.frustumCulled = false;
+    this.rings.renderOrder = 3;
+    this.group.add(this.marks, this.rings);
+
     // fire and smoke on blocks of about half a metre (coarser for big sites)
     const bs = Math.max(1, Math.round(Math.max(0.5, Math.sqrt((w * h * c * c) / 20000)) / c));
     this.bs = bs;
@@ -190,6 +210,8 @@ export class SimLayer {
     const m = new THREE.Matrix4();
     const P = pos[a], Q = pos[b], S = state[a];
     const turn = new THREE.Matrix4();
+    // during an earthquake, those not yet moving are taking cover: crouched
+    const crouch = !!r.quake;
     for (const { mesh, list } of Object.values(this.figures)) {
       for (const k of list) {
         const st = S[k];
@@ -198,14 +220,27 @@ export class SimLayer {
         // face the way they walk (figures are built facing +x)
         if (dx * dx + dy * dy > 1e-4) this.heading[k] = Math.atan2(-dy, dx);
         if (st === STATE.OUT) m.makeScale(0, 0, 0);
-        else if (st === STATE.OVERCOME || st === STATE.INJURED) m.makeRotationY(this.heading[k]).multiply(turn.makeRotationZ(Math.PI / 2)).setPosition(x, 0.2, y);
+        else if (st === STATE.OVERCOME || st === STATE.INJURED || st === STATE.KILLED) m.makeRotationY(this.heading[k]).multiply(turn.makeRotationZ(Math.PI / 2)).setPosition(x, st === STATE.KILLED ? 0.12 : 0.2, y);
+        else if (crouch && st === STATE.WAITING) m.makeRotationY(this.heading[k]).multiply(turn.makeScale(1.1, 0.55, 1.1)).setPosition(x, 0, y);
         else m.makeRotationY(this.heading[k]).setPosition(x, 0, y);
         mesh.setMatrixAt(this.slot[k], m);
+        // the moment they react: a mark over the head for 3 s, bobbing
+        const since = t - this.startAt[k];
+        if (since >= 0 && since < 3 && st !== STATE.OUT) m.makeScale(1, 1, 1).setPosition(x, 2.0 + 0.12 * Math.sin(since * 8), y);
+        else m.makeScale(0, 0, 0);
+        this.marks.setMatrixAt(k, m);
+        const down = st === STATE.KILLED || st === STATE.INJURED || st === STATE.OVERCOME;
+        if (down) m.makeTranslation(x, 0.55, y); else m.makeScale(0, 0, 0);
+        this.rings.setMatrixAt(k, m);
+        if (down) this.rings.setColorAt(k, STATE_COLOR[st]);
         mesh.setColorAt(this.slot[k], STATE_COLOR[st] || STATE_COLOR[STATE.MOVING]);
       }
       mesh.instanceMatrix.needsUpdate = true;
       mesh.instanceColor.needsUpdate = true;
     }
+    this.marks.instanceMatrix.needsUpdate = true;
+    this.rings.instanceMatrix.needsUpdate = true;
+    this.rings.instanceColor.needsUpdate = true;
 
     // smoke hangs under the ceiling and comes down as it thickens; flames flicker
     const hz = r.hazard, top = this.viewer.wallHeight, col = new THREE.Color();
@@ -354,7 +389,7 @@ export class SimLayer {
     const S = r.frames.state[a];
     const n = new Array(8).fill(0);
     for (const s of S) n[s]++;
-    return { waiting: n[STATE.WAITING], moving: n[STATE.MOVING], out: n[STATE.OUT], overcome: n[STATE.OVERCOME], trapped: n[STATE.TRAPPED], assist: n[STATE.ASSIST], injured: n[STATE.INJURED] };
+    return { waiting: n[STATE.WAITING], moving: n[STATE.MOVING], out: n[STATE.OUT], overcome: n[STATE.OVERCOME], trapped: n[STATE.TRAPPED], assist: n[STATE.ASSIST], injured: n[STATE.INJURED], killed: n[STATE.KILLED] };
   }
 }
 
