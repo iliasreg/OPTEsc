@@ -224,11 +224,11 @@ function freeAround(g, i) {
 }
 
 // Seconds to walk out from every cell at time t, steering around fire and smoke.
-function routeField(g, hz, t, field) {
+export function routeField(g, hz, t, field, maxSmoke = Infinity) {
   const { w, h, c, kind } = g;
   field.fill(Infinity);
   const heap = new MinHeap();
-  const blocked = (i) => !walkable(kind[i]) || hz.fireT[i] <= t + 2;
+  const blocked = (i) => !walkable(kind[i]) || hz.fireT[i] <= t + 2 || (maxSmoke !== Infinity && smokeAt(hz, i, t) >= maxSmoke);
   // cost per metre: slower in smoke, and people turn away from smoke they can see
   const cost = (i) => 1 + 4 * smokeAt(hz, i, t);
   for (let i = 0; i < w * h; i++) if (kind[i] === K.EXIT && !blocked(i)) { field[i] = 0; heap.push(0, i); }
