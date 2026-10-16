@@ -421,6 +421,19 @@ def make_handler(service, frontend=ROOT / "frontend"):
         def log_message(self, *args):
             pass
 
+        def send_header(self, keyword, value):
+            if keyword.lower() == "cache-control":
+                self._cache_set = True
+            super().send_header(keyword, value)
+
+        def end_headers(self):
+            # Static files must be revalidated: a cached old worker or module mixed with
+            # newer ones breaks the page after an update.
+            if not getattr(self, "_cache_set", False):
+                super().send_header("Cache-Control", "no-cache")
+            self._cache_set = False
+            super().end_headers()
+
         def reply(self, code, payload):
             raw = json.dumps(payload).encode()
             self.send_response(code)

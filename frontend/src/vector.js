@@ -72,24 +72,28 @@ function readCode(e, code, val) {
 }
 
 // Flatten entities (with block inserts) into polylines, arcs and texts in drawing units.
+// Each line keeps the top-level insert it came from (`ins`) and the block names on the way
+// down (`block`), so a chair drawn as a block stays one object.
 function flatten(dxf) {
   const out = { lines: [], fills: [], texts: [] };
-  const walk = (ents, tf, depth, inheritLayer) => {
+  let inserts = 0;
+  const walk = (ents, tf, depth, inheritLayer, ins = null, block = '') => {
     let poly = null;
+    const tag = (o) => (ins == null ? o : Object.assign(o, { ins, block }));
     for (const e of ents) {
       const layer = e.layer === '0' && inheritLayer ? inheritLayer : e.layer;
       const P = ([x, y]) => tf(x, y);
       switch (e.type) {
         case 'LINE':
-          if (e.pts[0]) out.lines.push({ layer, pts: [P(e.pts[0]), tf(e.x2, e.y2)] });
+          if (e.pts[0]) out.lines.push(tag({ layer, pts: [P(e.pts[0]), tf(e.x2, e.y2)] }));
           break;
         case 'LWPOLYLINE':
-          out.lines.push({ layer, pts: bulgePts(e.pts, e.bulges, e.flags & 1).map(P), closed: !!(e.flags & 1) });
+          out.lines.push(tag({ layer, pts: bulgePts(e.pts, e.bulges, e.flags & 1).map(P), closed: !!(e.flags & 1) }));
           break;
         case 'POLYLINE': poly = { layer, pts: [], bulges: [], closed: !!(e.flags & 1) }; break;
         case 'VERTEX': if (poly && e.pts[0]) { poly.pts.push(e.pts[0]); poly.bulges[poly.pts.length - 1] = e.bulges[0]; } break;
         case 'SEQEND':
-          if (poly) out.lines.push({ layer: poly.layer, pts: bulgePts(poly.pts, poly.bulges, poly.closed).map(P), closed: poly.closed });
+          if (poly) out.lines.push(tag({ layer: poly.layer, pts: bulgePts(poly.pts, poly.bulges, poly.closed).map(P), closed: poly.closed }));
           poly = null;
           break;
         case 'ARC': case 'CIRCLE': {
@@ -102,7 +106,7 @@ function flatten(dxf) {
             const a = ((a0 + ((a1 - a0) * k) / n) * Math.PI) / 180;
             pts.push(tf(cx + e.r * Math.cos(a), cy + e.r * Math.sin(a)));
           }
-          out.lines.push({ layer, pts, arc: true });
+          out.lines.push(tag({ layer, pts, arc: true, ...(e.type === 'CIRCLE' ? { circle: true } : {}) }));
           break;
         }
         case 'TEXT': case 'MTEXT':
@@ -130,7 +134,7 @@ function flatten(dxf) {
             const lx = (x - b.base[0]) * sx, ly = (y - b.base[1]) * sy;
             return tf(ix + lx * cos - ly * sin, iy + lx * sin + ly * cos);
           };
-          walk(b.entities, inner, depth + 1, layer);
+          walk(b.entities, inner, depth + 1, layer, ins ?? inserts++, block ? `${block}/${e.name}` : e.name);
           break;
         }
         default:
@@ -139,6 +143,271 @@ function flatten(dxf) {
   };
   walk(dxf.entities, (x, y) => [x, y], 0, null);
   return out;
+}
+
+// ---------- objects and stairs ----------
+//
+// Furniture, machines and stairs are thin linework, so the wall reader drops them. They are
+// read here from the vector data instead: by layer or block name (AIA, French, German,
+// Spanish, Italian, Dutch conventions), and stairs also by their shape (a run of evenly
+// spaced parallel treads), so a flight drawn on an unnamed layer is still found.
+
+const STAIR_RE = /stair|strs|escal|treppe|stufe|\btrap(pen)?\b|escada|escaler|\bmarches?\b|\bsteps?\b/i;
+const RAMP_RE = /\bramp|rampe|rampa/i;
+const FURN_LAYER = /furn|mobil|m[öo]e?bel|meub|muebl|arred|eqp|equip|machin|fixt|casework|plumb|sanit|appl|inventar|einricht|am[ée]nag|\bfur\b|\bmob\b/i;
+const SKIP_LAYER = /wall|\bmur|wand|door|porte|t[üu]r\b|window|fen[eê]tre|fenster|anno|text|dim|cote|grid|axe|hatch|hach|title|cartouche|viewport|defpoints|\barea|room|space|zone|pi[eè]ce|raum|north|nord/i;
+const SKIP_BLOCK = /door|porte|t[üu]r\b|window|fen[eê]tre|fenster|north|nord|arrow|fl[eè]che|section|title|cartouche|grid|axis|level|niveau|tag|label/i;
+// [category, name pattern, height in metres]
+export const OBJECT_TYPES = [
+  ['seat', /chair|chaise|seat|si[eè]ge|stuhl|sofa|canap|couch|bench|banc|fauteuil|stool|tabouret|sessel/i, 0.9],
+  ['table', /table|desk|bureau|tisch|schreib|workstation|poste|counter|comptoir|worktop|plan.?de.?travail|mesa|tavolo/i, 0.75],
+  ['storage', /shelf|shelv|[ée]tag[eè]re|rack|rayonnage|cabinet|armoire|wardrobe|cupboard|placard|schrank|regal|locker|casier|filing|bookcase|biblioth|estanter/i, 2.0],
+  ['bed', /\bbed|\blit\b|\bbett|\bcama\b|letto/i, 0.55],
+  ['sanitary', /\bwc|toilet|lavabo|sink|[ée]vier|basin|bath|baignoire|shower|douche|urinal|bidet|wasch|dusche/i, 0.85],
+  ['kitchen', /fridge|frigo|refrig|oven|\bfour\b|stove|cuisini[eè]re|\bhob\b|dishwash|lave.?vaisselle|k[üu]hl|\bherd\b/i, 0.9],
+  ['machine', /machin|eqp|equip|press|lathe|\btour\b|cnc|robot|conveyor|convoyeur|compress|generat|transfo|boiler|chaudi|maschin/i, 1.6],
+];
+const RISER_M = 0.17; // typical riser height
+
+function categoryOf(name) {
+  for (const [cat, re, hgt] of OBJECT_TYPES) if (re.test(name)) return { category: cat, height_m: hgt };
+  return null;
+}
+
+// Segments of a polyline in metres, y up (drawing frame).
+function segsOf(line, k) {
+  const out = [];
+  for (let i = 0; i + 1 < line.pts.length; i++) out.push([line.pts[i][0] * k, line.pts[i][1] * k, line.pts[i + 1][0] * k, line.pts[i + 1][1] * k]);
+  if (line.closed && line.pts.length > 2) {
+    const a = line.pts[line.pts.length - 1], b = line.pts[0];
+    out.push([a[0] * k, a[1] * k, b[0] * k, b[1] * k]);
+  }
+  return out;
+}
+
+function hull(points) {
+  const p = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1));
+}
+
+// Smallest rectangle around a set of points (its sides follow one hull edge).
+// Returns { corners: [4 points], u: unit vector along the first side, len: [side u, side v] }.
+export function minRect(points) {
+  const hp = hull(points);
+  if (hp.length < 2) return null;
+  let best = null;
+  for (let i = 0; i < hp.length; i++) {
+    const a = hp[i], b = hp[(i + 1) % hp.length];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 1e-9) continue;
+    const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const [x, y] of hp) {
+      const u = x * ux + y * uy, v = -x * uy + y * ux;
+      u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+    }
+    const area = (u1 - u0) * (v1 - v0);
+    if (!best || area < best.area - 1e-9) best = { area, ux, uy, u0, u1, v0, v1 };
+  }
+  if (!best) return null;
+  const { ux, uy, u0, u1, v0, v1 } = best;
+  const P = (u, v) => [u * ux - v * uy, u * uy + v * ux];
+  return { corners: [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)], u: [ux, uy], len: [u1 - u0, v1 - v0] };
+}
+
+// Union-find clusters of segments whose bounding boxes come within `tol` metres.
+function clusters(segs, tol) {
+  const n = segs.length, parent = Int32Array.from({ length: n }, (_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const box = segs.map(([x0, y0, x1, y1]) => [Math.min(x0, x1) - tol, Math.min(y0, y1) - tol, Math.max(x0, x1) + tol, Math.max(y0, y1) + tol]);
+  // sweep on x so big drawings stay fast
+  const order = [...box.keys()].sort((a, b) => box[a][0] - box[b][0]);
+  for (let s = 0; s < n; s++) {
+    const i = order[s];
+    for (let t = s + 1; t < n; t++) {
+      const j = order[t];
+      if (box[j][0] > box[i][2]) break;
+      if (box[j][1] <= box[i][3] && box[j][3] >= box[i][1]) parent[find(i)] = find(j);
+    }
+  }
+  const groups = new Map();
+  for (let i = 0; i < n; i++) { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); }
+  return [...groups.values()];
+}
+
+// Stair flights in a set of segments: at least `minTreads` parallel segments of about the
+// same length (0.6 to 3 m), evenly spaced one tread apart (0.2 to 0.45 m), side by side.
+// Returns [{ corners, u (direction of travel), treads, segs: [indices] }].
+export function findFlights(segs, minTreads = 4) {
+  const items = [];
+  segs.forEach(([x0, y0, x1, y1], i) => {
+    const L = Math.hypot(x1 - x0, y1 - y0);
+    if (L < 0.6 || L > 3) return;
+    let a = Math.atan2(y1 - y0, x1 - x0);
+    if (a < 0) a += Math.PI;
+    if (a >= Math.PI) a -= Math.PI;
+    items.push({ i, L, a, mx: (x0 + x1) / 2, my: (y0 + y1) / 2 });
+  });
+  const used = new Set(), flights = [];
+  // group by direction (2 degree bins, neighbours merged)
+  const bins = new Map();
+  for (const it of items) { const b = Math.round((it.a * 180) / Math.PI / 2) % 90; if (!bins.has(b)) bins.set(b, []); bins.get(b).push(it); }
+  for (const [b, list0] of bins) {
+    const list = [...list0, ...(bins.get((b + 1) % 90) || []).filter((it) => Math.abs(it.a - list0[0].a) < 0.06)];
+    if (list.length < minTreads) continue;
+    const a = list0[0].a, tx = Math.cos(a), ty = Math.sin(a); // tread direction
+    const nx = -ty, ny = tx; // travel direction
+    // sort along the travel direction, then grow runs of evenly spaced, overlapping treads
+    list.sort((p, q) => (p.mx * nx + p.my * ny) - (q.mx * nx + q.my * ny));
+    const pos = (p) => p.mx * nx + p.my * ny, along = (p) => p.mx * tx + p.my * ty;
+    for (const seed of list) {
+      if (used.has(seed.i)) continue;
+      const run = [seed];
+      let step = null;
+      for (const q of list) {
+        if (used.has(q.i) || run.includes(q)) continue;
+        const last = run[run.length - 1];
+        const d = pos(q) - pos(last);
+        if (d < 0.15) continue;
+        if (d > 0.5) break;
+        if (Math.abs(q.L - seed.L) > 0.15 * seed.L || Math.abs(along(q) - along(seed)) > 0.25 * seed.L) continue;
+        if (d < 0.2 || d > 0.45 || (step && Math.abs(d - step) > 0.25 * step)) continue;
+        step ??= d;
+        run.push(q);
+      }
+      if (run.length < minTreads || run.length > 31) continue;
+      for (const q of run) used.add(q.i);
+      const pts = run.flatMap((q) => { const s = segs[q.i]; return [[s[0], s[1]], [s[2], s[3]]]; });
+      const r = minRect(pts);
+      // the flight runs from its first nosing line to its last: one step between each pair
+      const p0 = pos(run[0]), p1 = pos(run[run.length - 1]);
+      const a0 = along(seed) - seed.L / 2, a1 = along(seed) + seed.L / 2;
+      const P = (u, v) => [u * nx + v * tx, u * ny + v * ty];
+      flights.push({ corners: [P(p0, a0), P(p1, a0), P(p1, a1), P(p0, a1)], u: [nx, ny], treads: run.length - 1, going_m: step, width_m: seed.L, segs: run.map((q) => q.i), rect: r });
+    }
+  }
+  return flights;
+}
+
+// Objects and stairs of a flattened drawing, in metres in the drawing frame (y up).
+export function extractObjects(flat, unitM) {
+  const k = unitM;
+  const lines = flat.lines.filter((l) => l.pts.length >= 2 && !SKIP_LAYER.test(l.layer) && !(l.block && SKIP_BLOCK.test(l.block)));
+  const isStair = (l) => STAIR_RE.test(l.layer) || (l.block && STAIR_RE.test(l.block));
+  const isRamp = (l) => RAMP_RE.test(l.layer) || (l.block && RAMP_RE.test(l.block));
+  const objects = [];
+
+  // 1. stairs: named stair linework, clustered (treads rarely touch each other)
+  const stairLines = lines.filter(isStair), taken = new Set();
+  const stairSegs = [], segLine = [];
+  stairLines.forEach((l) => { for (const s of segsOf(l, k)) { stairSegs.push(s); segLine.push(l); } });
+  for (const group of clusters(stairSegs, 0.45)) {
+    const segs = group.map((i) => stairSegs[i]);
+    const flights = findFlights(segs, 3);
+    for (const f of flights) objects.push(stairObject(f, 'layer'));
+    if (!flights.length) {
+      // a stair symbol without readable treads: keep its outline
+      const r = minRect(segs.flatMap((s) => [[s[0], s[1]], [s[2], s[3]]]));
+      if (r && r.len[0] * r.len[1] > 0.5) {
+        const along = r.len[0] >= r.len[1] ? 0 : 1;
+        const c = along ? [r.corners[1], r.corners[2], r.corners[3], r.corners[0]] : r.corners;
+        const L = r.len[along];
+        objects.push({ kind: 'stair', source: 'layer', polygon: c, treads: Math.max(3, Math.round(L / 0.28)), going_m: 0.28, width_m: r.len[1 - along] });
+      }
+    }
+    for (const i of group) taken.add(segLine[i]);
+  }
+  // ramps: one outline each
+  for (const group of groupLines(lines.filter((l) => !taken.has(l) && isRamp(l)), k, 0.3)) {
+    const r = minRect(group.flatMap((l) => segsOf(l, k).flatMap((s) => [[s[0], s[1]], [s[2], s[3]]])));
+    if (r && r.len[0] * r.len[1] > 1) objects.push({ kind: 'ramp', source: 'layer', polygon: r.corners });
+    for (const l of group) taken.add(l);
+  }
+
+  // 2. stairs by shape among the other linework (stairs drawn on layer 0 or a furniture layer)
+  const rest = lines.filter((l) => !taken.has(l));
+  const restSegs = [], restLine = [];
+  rest.forEach((l) => { if (l.arc) return; for (const s of segsOf(l, k)) { restSegs.push(s); restLine.push(l); } });
+  for (const f of findFlights(restSegs, 5)) {
+    objects.push(stairObject(f, 'shape'));
+    for (const i of f.segs) taken.add(restLine[i]);
+    // stringers and the walking line inside the flight belong to it too
+    const r = f.corners;
+    restSegs.forEach((s, i) => { if (insideQuad(r, (s[0] + s[2]) / 2, (s[1] + s[3]) / 2, 0.1)) taken.add(restLine[i]); });
+  }
+
+  // 3. furniture and machines: one object per block insert, or per connected group of lines
+  const furn = lines.filter((l) => !taken.has(l) && (FURN_LAYER.test(l.layer) || (l.block && categoryOf(l.block))));
+  const byInsert = new Map(), loose = [];
+  for (const l of furn) {
+    if (l.ins != null) { if (!byInsert.has(l.ins)) byInsert.set(l.ins, []); byInsert.get(l.ins).push(l); } else loose.push(l);
+  }
+  const groups = [...byInsert.values(), ...groupLines(loose, k, 0.02)];
+  for (const g of groups) {
+    const pts = g.flatMap((l) => l.pts.map(([x, y]) => [x * k, y * k]));
+    const r = minRect(pts);
+    if (!r) continue;
+    const [a, b] = r.len, area = a * b;
+    if (area < 0.04 || Math.max(a, b) > 25 || Math.min(a, b) < 0.05) continue;
+    const name = `${g[0].block || ''} ${g[0].layer}`;
+    const cat = categoryOf(g[0].block || '') || categoryOf(g[0].layer) || guessCategory(a, b, g[0].layer);
+    // a single closed outline keeps its own shape (L-shaped desks, round tables)
+    const own = g.length === 1 && (g[0].closed || g[0].circle) && g[0].pts.length >= 3 ? g[0].pts.map(([x, y]) => [x * k, y * k]) : null;
+    objects.push({ kind: 'object', category: cat.category, height_m: cat.height_m, name: name.trim(), polygon: own && own.length <= 64 ? own : r.corners });
+  }
+  return objects;
+}
+
+function stairObject(f, source) {
+  return { kind: 'stair', source, polygon: f.corners, treads: f.treads, going_m: round3(f.going_m), width_m: round3(f.width_m), rise_m: round3(f.treads * RISER_M) };
+}
+const round3 = (v) => Math.round(v * 1000) / 1000;
+
+function groupLines(lines, k, tol) {
+  const segs = [], owner = [];
+  lines.forEach((l, i) => { for (const s of segsOf(l, k)) { segs.push(s); owner.push(i); } });
+  const out = [];
+  for (const g of clusters(segs, tol)) out.push([...new Set(g.map((i) => owner[i]))].map((i) => lines[i]));
+  return out;
+}
+
+function guessCategory(a, b, layer) {
+  const big = a * b, thin = Math.min(a, b);
+  if (/eqp|equip|machin/i.test(layer) || big > 6) return { category: 'machine', height_m: 1.6 };
+  if (thin < 0.7 && Math.max(a, b) > 1.2) return { category: 'storage', height_m: 2.0 };
+  if (big < 0.5) return { category: 'seat', height_m: 0.9 };
+  return { category: 'table', height_m: 0.75 };
+}
+
+function insideQuad(q, x, y, tol = 0) {
+  // q is a rectangle: test against its two side directions
+  const [a, b, , d] = q;
+  const ux = b[0] - a[0], uy = b[1] - a[1], vx = d[0] - a[0], vy = d[1] - a[1];
+  const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+  const pu = ((x - a[0]) * ux + (y - a[1]) * uy) / lu, pv = ((x - a[0]) * vx + (y - a[1]) * vy) / lv;
+  return pu >= -tol && pu <= lu + tol && pv >= -tol && pv <= lv + tol;
+}
+
+// Objects and stairs straight from DXF text, in metres (drawing frame, y up).
+export function dxfObjects(text) {
+  const dxf = parseDxf(text);
+  const flat = flatten(dxf);
+  return extractObjects(flat, unitOf(dxf, flat));
+}
+
+function unitOf(dxf, flat) {
+  if (UNIT_M[dxf.units]) return UNIT_M[dxf.units];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const e of [...flat.lines, ...flat.fills]) for (const [x, y] of e.pts) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  const span = Math.max(maxX - minX, maxY - minY);
+  return span > 2000 ? 0.001 : span > 300 ? 0.01 : 1;
 }
 
 function bulgePts(pts, bulges, closed) {
@@ -225,8 +494,11 @@ export function renderDxf(text, { wallLayers = null, wallStrokeM = 0.12, maxPx =
     ctx.stroke();
   }
   const texts = flat.texts.map((t) => ({ text: t.text, x: toPx(t.at)[0], y: toPx(t.at)[1] }));
+  // objects and stairs, from metres back to canvas pixels
+  const toPxM = ([x, y]) => toPx([x / unitM, y / unitM]);
+  const objects = extractObjects(flat, unitM).map((o) => ({ ...o, polygon: o.polygon.map(toPxM) }));
   return {
-    canvas: cv, pxPerM, texts,
+    canvas: cv, pxPerM, texts, objects,
     layers: layerNames.map((name) => ({ name, wall: walls.has(name) })),
     unitsGuessed: guessed ? (unitM === 0.001 ? 'millimetres' : unitM === 0.01 ? 'centimetres' : 'metres') : null,
   };

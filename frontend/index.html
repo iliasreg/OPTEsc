@@ -61,7 +61,8 @@
   #empty { color: var(--muted); }
   .legend { display: flex; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
-  #stats div:last-child b { font-size: 15px; }
+  #stats div:nth-child(4) b { font-size: 15px; }
+  #stats .objects-note { grid-column: 1 / -1; margin: 2px 0 0; color: var(--muted); font-size: 12px; }
   #issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
   #issues li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); cursor: pointer; font-size: 13px; }
   #issues li:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -88,6 +89,11 @@
   .simlist li[data-fire] { cursor: pointer; } .simlist li[data-fire]:hover { border-color: var(--accent); }
   .tag { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 10px; color: #fff; align-self: start; }
   .tag.bad { background: var(--crit); } .tag.warn { background: var(--warn); } .tag.ok { background: #2f9e5b; }
+  body[data-scenario="earthquake"] .fire-only, body:not([data-scenario="earthquake"]) .quake-only { display: none !important; }
+  .verdict { border-radius: 8px; padding: 10px 12px; margin: 4px 0 10px; display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  .verdict b { font-size: 16px; } .verdict.ok { background: color-mix(in srgb, #2f9e5b 14%, var(--panel)); } .verdict.ok b { color: #2f9e5b; }
+  .verdict.bad { background: color-mix(in srgb, var(--crit) 14%, var(--panel)); } .verdict.bad b { color: var(--crit); }
+  .simnote { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
   #sim-h3 { font-size: 12px; color: var(--muted); margin: 10px 0 0; font-weight: 600; }
   #player { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; z-index: 3; }
   #player[hidden] { display: none; }
@@ -144,13 +150,30 @@
   <section><div id="stats"></div></section>
   <section id="sim">
     <h2>Fire drill</h2>
-    <label class="f">Fire starts in<select id="sim-fire"></select></label>
-    <label class="f">Fire spreads<select id="sim-speed"><option value="0.02">Slowly</option><option value="0.05" selected>Normally</option><option value="0.1">Fast</option></select></label>
+    <label class="f">Emergency<select id="sim-scenario"><option value="fire" selected>Fire</option><option value="earthquake">Earthquake</option></select></label>
+    <label class="f">Building use<select id="sim-use"></select></label>
+    <label class="f fire-only">Fire starts in<select id="sim-fire"></select></label>
+    <label class="f quake-only">Shaking<select id="sim-quake"><option value="moderate">Moderate (0.15 g)</option><option value="strong" selected>Strong (0.3 g)</option><option value="severe">Severe (0.5 g)</option><option value="extreme">Extreme (0.8 g)</option></select></label>
+    <label class="f quake-only">Structure<select id="sim-building"></select></label>
+    <label class="f quake-only">Seismic design<select id="sim-design"><option value="pre">Before codes</option><option value="low" selected>Low code</option><option value="moderate">Moderate code</option><option value="high">High code</option></select></label>
     <label class="f">People<input id="sim-people" type="number" min="0" step="1" placeholder="auto"></label>
+    <label class="f">Who is inside<select id="sim-mix"><option value="workforce" selected>Staff at work</option><option value="public">Open to the public</option><option value="care">Care home or hospital</option><option value="adults">Adults only</option></select></label>
+    <label class="f" id="sim-stairs-row" hidden title="On an upper floor the stairs are the way out. Wheelchair users cannot use them and wait for help at the landing.">Stairs lead down to the exit<input id="sim-stairs" type="checkbox" style="justify-self:end;width:auto"></label>
+    <details class="workspace-group fire-only" id="sim-systems"><summary>Fire safety systems</summary>
+      <label class="f">Detection<select id="sim-detect"><option value="smoke" selected>Smoke detectors</option><option value="heat">Heat detectors</option><option value="none">None (manual alarm)</option></select></label>
+      <label class="f">Sprinklers<select id="sim-sprinklers"><option value="none" selected>None</option><option value="quick">Quick response</option><option value="standard">Standard response</option></select></label>
+      <label class="f">Alarm<select id="sim-alarm"><option value="standard" selected>Bells or sirens</option><option value="voice">Voice messages</option></select></label>
+      <label class="f">Inside doors<select id="sim-doors"><option value="open" selected>Held open</option><option value="closed">Kept closed</option></select></label>
+      <label class="f">Fire growth<select id="sim-growth"><option value="medium">Medium</option><option value="fast" selected>Fast (most buildings)</option><option value="ultrafast">Ultra-fast (high storage)</option></select></label>
+      <label class="f">Ceiling height (m)<input id="sim-ceiling" type="number" min="2" max="30" step="0.1" value="3"></label>
+    </details>
     <div class="row">
-      <button id="sim-run" class="primary">Run fire drill</button>
-      <button id="sim-pick" aria-pressed="false" title="Click a spot in the 3D view to start the fire there">Pick spot</button>
-      <button id="sim-worst" title="Start a fire in every room and rank them">Find worst fire</button>
+      <button id="sim-check" title="Run the drill many times with different people and check each room stays safe long enough">Safety check</button>
+    </div>
+    <div class="row">
+      <button id="sim-run" class="primary">Run drill</button>
+      <button id="sim-pick" class="fire-only" aria-pressed="false" title="Click a spot in the 3D view to start the fire there">Pick spot</button>
+      <button id="sim-worst" class="fire-only" title="Start a fire in every room and rank them">Find worst fire</button>
     </div>
     <section id="drill-guidance" aria-labelledby="rag-title" style="margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px">
       <h2 id="rag-title">Automatic drill subtitles</h2>
@@ -178,7 +201,7 @@
     <ul id="zones"></ul>
   </section>
   <div class="legend">
-    <span><i style="background:#3b4048"></i>Wall</span><span><i style="background:#f2a541"></i>Door</span><span><i style="background:#2fbf71"></i>Exit</span><span><i style="background:#7cc4e8"></i>Window</span>
+    <span><i style="background:#3b4048"></i>Wall</span><span><i style="background:#f2a541"></i>Door</span><span><i style="background:#2fbf71"></i>Exit</span><span><i style="background:#7cc4e8"></i>Window</span><span><i style="background:#b48a62"></i>Furniture</span><span><i style="background:#5b6672"></i>Machine</span><span><i style="background:#c9c1b2"></i>Stairs</span>
   </div>
 </aside>
 <div id="main">
@@ -190,6 +213,7 @@
       <button data-mode="orbit" aria-pressed="true">Orbit</button>
       <button data-mode="walk" aria-pressed="false">Walk inside</button>
       <label><input id="t-labels" type="checkbox" checked>Labels</label>
+      <label><input id="t-objects" type="checkbox" checked>Furniture &amp; stairs</label>
       <select id="color-mode" aria-label="Floor colour" style="width:auto"><option value="zones">Colour: rooms</option><option value="distance">Colour: distance to exit</option></select>
       <label><input id="t-overlay" type="checkbox">Plan on floor</label>
       <label>Walls <input id="p-height" type="range" min="0.5" max="6" step="0.1" value="2.6" style="width:80px"></label>

@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { PointerLockControls } from '../vendor/PointerLockControls.js';
+import { objectCells } from './objects.js';
 
 const KIND_OF = { o: 0, '.': 1, '#': 2, D: 3, E: 4, W: 5 };
 export const TYPE_COLORS = {
@@ -21,6 +22,7 @@ export class Viewer {
     this.wallHeight = 2.6;
     this.showOverlay = false;
     this.showLabels = true;
+    this.showObjects = true;
     this.mode = 'orbit';
     this.keys = new Set();
 
@@ -112,6 +114,13 @@ export class Viewer {
     this.orbit.update();
   }
   setLabels(on) { this.showLabels = on; this._labelVis(); }
+  // Leave some wall cells and objects out of the model (the earthquake playback animates them).
+  setHidden(hidden) {
+    if (!hidden && !this.hidden) return;
+    this.hidden = hidden;
+    this.refresh();
+  }
+  setObjects(on) { this.showObjects = on; if (this.objects) this.objects.visible = on; }
   // zone labels float above the roofline: useful from above, in the way when walking
   _labelVis() {
     if (!this.labels) return;
@@ -186,7 +195,8 @@ export class Viewer {
         col = distanceColor(this.dist[y * w + x], limit);
       } else if (k === 1) {
         const zi = zoneIdx.get(this.zone[y * w + x]);
-        col = zi ? zoneColor(zi.z, zi.i) : '#cfd5dc';
+        // soft room tints, so furniture, people and fire stand out against the floor
+        col = zi ? mix(zoneColor(zi.z, zi.i), '#f4f1ea', 0.5) : '#dfe3e8';
         if (this.selected && zi && zi.z.id !== this.selected) col = mix(col, '#e9edf1', 0.65);
       } else if (k === 3) col = '#f2a541';
       else if (k === 4) col = '#2fbf71';
@@ -238,14 +248,16 @@ export class Viewer {
     this.root.add(floor);
 
     // walls: merge cells into rectangles, one instanced box each
-    const wallRects = mergeRects(this.kind, w, h, (k) => k === 2);
+    // wall cells the earthquake playback draws itself (panels that fall) are left out here
+    const kind = this.hidden?.cells?.size ? this.kind.map((k, i) => (this.hidden.cells.has(i) && (k === 2 || k === 5) ? 0 : k)) : this.kind;
+    const wallRects = mergeRects(kind, w, h, (k) => k === 2);
     this.root.add(this._boxes(wallRects, 0, this.wallHeight, '#eef0f3', true));
     // lintels above doors and exits
     const lintel = Math.min(2.1, this.wallHeight - 0.2);
     this.root.add(this._boxes(mergeRects(this.kind, w, h, (k) => k === 3), lintel, this.wallHeight, '#f2a541'));
     this.root.add(this._boxes(mergeRects(this.kind, w, h, (k) => k === 4), lintel, this.wallHeight, '#2fbf71'));
     // windows: sill, glass, lintel
-    const win = mergeRects(this.kind, w, h, (k) => k === 5);
+    const win = mergeRects(kind, w, h, (k) => k === 5);
     const sill = Math.min(0.9, lintel - 0.2);
     this.root.add(this._boxes(win, 0, sill, '#eef0f3', true));
     this.root.add(this._boxes(win, lintel, this.wallHeight, '#eef0f3', true));
@@ -253,6 +265,16 @@ export class Viewer {
     glass.material.transparent = true;
     glass.material.opacity = 0.35;
     this.root.add(glass);
+
+    // furniture, machines and stairs
+    this.objects = this._objects((this.site.objects || []).filter((o) => !this.hidden?.objects?.has(o.id)));
+    this.objects.visible = this.showObjects;
+    this.root.add(this.objects);
+    // walking bumps into furniture taller than a low table
+    this.objMask = new Uint8Array(w * h);
+    for (const o of this.site.objects || []) {
+      if (o.kind === 'object' && (o.height_m ?? 1) >= 0.4) for (const i of objectCells(this.site.grid, o)) this.objMask[i] = 1;
+    }
 
     // labels
     const ls = Math.max(0.5, Math.min(3, Math.max(W, H) / 40)); // label size follows site size
@@ -262,6 +284,12 @@ export class Viewer {
       s.position.set(z.centroid[0], this.wallHeight + 1.2 * ls, z.centroid[1]);
       labels.add(s);
     });
+    for (const o of (this.site.objects || []).filter((o) => o.kind === 'stair')) {
+      const s = label('Stairs', `${o.treads} steps`, STAIR_COLOR, 0.5 * ls);
+      s.position.set(o.centroid[0], this.wallHeight + 0.5, o.centroid[1]);
+      s.userData.stair = true;
+      labels.add(s);
+    }
     for (const d of this.site.doors.filter((d) => d.is_exit)) {
       const s = label('EXIT', d.id, '#2fbf71', 0.6 * ls);
       s.position.set(d.x, this.wallHeight + 0.6, d.y);
@@ -296,6 +324,44 @@ export class Viewer {
     const cam = this.sun.shadow.camera;
     cam.left = -d; cam.right = d; cam.top = d; cam.bottom = -d; cam.near = 1; cam.far = d * 3;
     cam.updateProjectionMatrix();
+  }
+
+  // One merged mesh per material: objects as blocks (tables as a top on a base), stairs as steps.
+  _objects(objects) {
+    const group = new THREE.Group();
+    group.name = 'objects';
+    const parts = new Map(); // colour -> geometries
+    const put = (color, geo) => { if (!parts.has(color)) parts.set(color, []); parts.get(color).push(geo); };
+    const top = this.wallHeight;
+    for (const o of objects) {
+      if (o.kind === 'stair') {
+        const [a, b, , d] = o.polygon;
+        const n = Math.max(1, o.treads || 1);
+        const rise = Math.min(0.19, (top - 0.1) / n);
+        for (let k = 0; k < n; k++) {
+          // step k covers [k/n, (k+1)/n] of the way from a to b, full width a to d
+          const f0 = k / n, f1 = (k + 1) / n;
+          const P = (f, g) => [a[0] + (b[0] - a[0]) * f + (d[0] - a[0]) * g, a[1] + (b[1] - a[1]) * f + (d[1] - a[1]) * g];
+          put(k % 2 ? STAIR_COLOR : STAIR_EDGE, prism([P(f0, 0), P(f1, 0), P(f1, 1), P(f0, 1)], 0, (k + 1) * rise));
+        }
+        continue;
+      }
+      if (o.kind === 'ramp') { put('#d8d2c4', prism(o.polygon, 0, 0.03)); continue; }
+      const st = OBJECT_STYLE[o.category] || OBJECT_STYLE.other;
+      const hgt = o.height_m ?? st.h;
+      if (st.slab) {
+        // a top slab on a narrower base reads as a table or a seat, not a crate
+        put(st.color, prism(o.polygon, hgt - st.slab, hgt));
+        put(st.base, prism(shrink(o.polygon, 0.45), 0, hgt - st.slab));
+      } else put(st.color, prism(o.polygon, 0, hgt));
+    }
+    for (const [color, geos] of parts) {
+      const mesh = new THREE.Mesh(mergeAll(geos), new THREE.MeshStandardMaterial({ color, roughness: 0.75 }));
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+    return group;
   }
 
   _boxes(rects, y0, y1, color, shadows = false) {
@@ -337,7 +403,7 @@ export class Viewer {
       const gx = Math.floor((x + dx) / this.c), gy = Math.floor((z + dz) / this.c);
       if (gx < 0 || gy < 0 || gx >= this.w || gy >= this.h) continue;
       const k = this.kind[gy * this.w + gx];
-      if (k === 2 || k === 5) return true;
+      if (k === 2 || k === 5 || (this.showObjects && this.objMask?.[gy * this.w + gx])) return true;
     }
     return false;
   }
@@ -385,6 +451,51 @@ export class Viewer {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
+}
+
+// Object looks: colour, default height, and for tables and seats the top slab thickness and base colour.
+export const OBJECT_STYLE = {
+  table: { color: '#b48a62', base: '#7a6655', h: 0.75, slab: 0.05 },
+  seat: { color: '#5f6f82', base: '#3f4955', h: 0.45, slab: 0.08 },
+  storage: { color: '#c6cbd2', h: 2.0 },
+  bed: { color: '#e4ded2', h: 0.55 },
+  sanitary: { color: '#f5f7f9', h: 0.8 },
+  kitchen: { color: '#d4d9df', h: 0.9 },
+  machine: { color: '#5b6672', h: 1.6 },
+  other: { color: '#a3aab3', h: 1.0 },
+};
+export const STAIR_COLOR = '#c9c1b2';
+const STAIR_EDGE = '#b3aa98';
+
+// A footprint polygon (site metres, x and y) extruded from y0 to y1 metres up.
+function prism(poly, y0, y1) {
+  const shape = new THREE.Shape(poly.map(([x, y]) => new THREE.Vector2(x, y)));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: Math.max(0.01, y1 - y0), bevelEnabled: false });
+  // shape y -> world z, extrusion -> world up
+  geo.rotateX(Math.PI / 2);
+  geo.translate(0, y1, 0);
+  return geo;
+}
+function shrink(poly, f) {
+  const [cx, cy] = poly.reduce(([a, b], [x, y]) => [a + x / poly.length, b + y / poly.length], [0, 0]);
+  return poly.map(([x, y]) => [cx + (x - cx) * f, cy + (y - cy) * f]);
+}
+// Geometries into one (positions and normals), so a floor of furniture is a few draw calls.
+function mergeAll(geos) {
+  const flat = geos.map((g) => (g.index ? g.toNonIndexed() : g));
+  const n = flat.reduce((t, g) => t + g.getAttribute('position').count, 0);
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+  let o = 0;
+  for (const g of flat) {
+    pos.set(g.getAttribute('position').array, o * 3);
+    nor.set(g.getAttribute('normal').array, o * 3);
+    o += g.getAttribute('position').count;
+    g.dispose();
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  return out;
 }
 
 // Greedy merge of grid cells into rectangles [x, y, w, h].

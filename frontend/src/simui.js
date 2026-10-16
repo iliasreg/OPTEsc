@@ -1,26 +1,31 @@
 // The "Fire drill" panel: start a fire, play it back in 3D and read what happened.
 import { SimLayer, PEOPLE_COLORS } from './simview.js';
-import { simulate, worstFire } from './sim.js';
+import { QuakeView } from './quakeview.js';
+import { simulate, worstFire, assess, MIXES, PROFILES, OCCUPANCY } from './sim.js';
+import { BUILDINGS } from './quake.js';
 import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
 
 const $ = (id) => document.getElementById(id);
+// Bump when the simulation changes: the worker and the simulation it loads are fetched afresh.
+const WORKER_VERSION = '2026-10-16b';
 const mmss = (s) => { if (s == null) return '–'; const r = Math.round(s); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export function initSim({ viewer, getSite, setStatus }) {
-  const layer = new SimLayer(viewer);
+  const layer = new SimLayer(viewer, { QuakeView });
   const guidance = initDrillGuidance({ getSite, onHighlight: (event, site) => layer.highlight(event, site) });
   let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
   let picking = false, playing = false, last = 0, busy = false;
   let worker = null, nextId = 1, noWorker = false;
-  const here = (cmd, site, opts, onProgress) => Promise.resolve().then(() => (cmd === 'run' ? simulate(site, opts) : worstFire(site, opts, onProgress)));
+  const here = (cmd, site, opts, onProgress) => Promise.resolve().then(() => (cmd === 'run' ? simulate(site, opts) : cmd === 'assess' ? assess(site, opts, opts.runs || 20, onProgress) : worstFire(site, opts, onProgress)));
   const pending = new Map();
 
   function call(cmd, site, opts, onProgress) {
     if (noWorker) return here(cmd, site, opts, onProgress);
     try {
-      worker ||= new Worker(new URL('./simworker.js', import.meta.url), { type: 'module' });
+      // versioned URL: a browser holding an older worker in its cache cannot reuse it
+      worker ||= new Worker(new URL(`./simworker.js?v=${WORKER_VERSION}`, import.meta.url), { type: 'module' });
       worker.onmessage = (e) => {
         const p = pending.get(e.data.id);
         if (!p) return;
@@ -44,13 +49,42 @@ export function initSim({ viewer, getSite, setStatus }) {
   }
 
   // what the simulation needs from the site (the rest stays on the page)
-  const simSite = (s) => ({ grid: s.grid, zones: s.zones.map(({ id, name, type, area_m2, grid_area_m2, centroid }) => ({ id, name, type, area_m2, grid_area_m2, centroid })), doors: s.doors.map(({ id, x, y, width_m, is_exit, connects, cells }) => ({ id, x, y, width_m, is_exit, connects, cells })) });
+  // building use, structure: options filled from the model's own tables
+  for (const [k, u] of Object.entries(OCCUPANCY)) $('sim-use').add(new Option(u.label, k));
+  for (const [k, b] of Object.entries(BUILDINGS)) $('sim-building').add(new Option(b.label, k));
+  $('sim-building').value = 'C1L';
+  // a building use suggests who is inside (still free to change)
+  const USE_MIX = { office: 'workforce', retail: 'public', hotel: 'public', apartment: 'public', clinic: 'public', care: 'care' };
+  $('sim-use').addEventListener('change', () => { $('sim-mix').value = USE_MIX[$('sim-use').value] || 'workforce'; });
+  // unreinforced masonry is not built to moderate or high codes
+  const designs = () => {
+    const ok = BUILDINGS[$('sim-building').value].codes;
+    for (const opt of $('sim-design').options) opt.disabled = !ok[opt.value];
+    if (!ok[$('sim-design').value]) $('sim-design').value = Object.keys(ok).includes('low') ? 'low' : Object.keys(ok)[0];
+  };
+  $('sim-building').addEventListener('change', designs);
+  // the 3D wall height follows the ceiling height
+  $('sim-ceiling').addEventListener('change', () => { const v = parseFloat($('sim-ceiling').value); if (v > 0) { viewer.setWallHeight(v); const sl = document.getElementById('p-height'); if (sl) sl.value = v; } });
+  const simSite = (s) => ({ grid: s.grid, openings: s.openings || [], zones: s.zones.map(({ id, name, type, area_m2, grid_area_m2, centroid }) => ({ id, name, type, area_m2, grid_area_m2, centroid })), doors: s.doors.map(({ id, x, y, width_m, is_exit, connects, cells, swing }) => ({ id, x, y, width_m, is_exit, connects, cells, swing })), objects: (s.objects || []).map(({ id, kind, category, height_m, polygon }) => ({ id, kind, category, height_m, polygon })) });
   function opts() {
     const total = parseInt($('sim-people').value, 10);
     return {
       fire: fireAt || $('sim-fire').value,
-      fireSpeed: parseFloat($('sim-speed').value),
+      scenario: $('sim-scenario').value,
+      quakeLevel: $('sim-quake').value,
+      building: $('sim-building').value,
+      design: $('sim-design').value,
+      wallHeight: viewer.wallHeight,
+      use: $('sim-use').value,
+      detection: $('sim-detect').value,
+      sprinklers: $('sim-sprinklers').value,
+      alarm: $('sim-alarm').value,
+      interiorDoors: $('sim-doors').value,
+      growth: $('sim-growth').value,
+      ceiling: Math.max(2, parseFloat($('sim-ceiling').value) || 3),
       total: Number.isFinite(total) && total >= 0 ? total : null,
+      mix: MIXES[$('sim-mix').value] || null,
+      stairsOut: !$('sim-stairs-row').hidden && $('sim-stairs').checked,
     };
   }
 
@@ -65,6 +99,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     const sel = $('sim-fire');
     const keep = sel.value;
     sel.innerHTML = '';
+    $('sim-stairs-row').hidden = !(s?.objects || []).some((o) => o.kind === 'stair');
     if (!s) return;
     const byArea = [...s.zones].sort((a, b) => b.area_m2 - a.area_m2);
     for (const z of byArea) sel.add(new Option(z.name, z.id));
@@ -79,7 +114,8 @@ export function initSim({ viewer, getSite, setStatus }) {
     stop();
     const token = revision;
     busy = true;
-    setStatus('Running the fire drill…');
+    const what = $('sim-scenario').value === 'earthquake' ? 'earthquake drill' : 'fire drill';
+    setStatus(`Running the ${what}…`);
     const t0 = performance.now();
     try {
       const evacuationExitIds = drillExitIds(await siteFingerprint(s));
@@ -93,12 +129,83 @@ export function initSim({ viewer, getSite, setStatus }) {
       $('pl-time').max = layer.duration;
       seek(0);
       play(true);
-      setStatus(`Fire drill worked out in ${Math.round(performance.now() - t0)} ms`);
+      setStatus(`${what[0].toUpperCase()}${what.slice(1)} worked out in ${Math.round(performance.now() - t0)} ms`);
     } catch (err) {
       if (token !== revision) return;
-      setStatus(`Fire drill failed: ${err.message}`, true);
+      setStatus(`The ${what} failed: ${err.message}`, true);
       console.error(err);
     } finally { busy = false; }
+  }
+
+  // Safety check: many runs, ASET against RSET for each room
+  async function check() {
+    const s = getSite();
+    if (!s || busy) return;
+    if (!s.doors.some((d) => d.is_exit)) { setStatus('This plan has no exit yet.', true); return; }
+    stop();
+    const token = revision;
+    busy = true;
+    const runs = 20;
+    // nothing moves on screen meanwhile: pause the 3D view so the runs get the processor
+    viewer.renderer.setAnimationLoop(null);
+    try {
+      const evacuationExitIds = drillExitIds(await siteFingerprint(s));
+      if (token !== revision || s !== getSite()) return;
+      const r = await call('assess', { ...simSite(s), evacuationExitIds }, { ...opts(), runs }, (done, total) => setStatus(`Safety check: run ${done} of ${total}…`));
+      if (token !== revision || s !== getSite()) return;
+      showCheck(r, s);
+      setStatus(`Safety check done: ${runs} runs.`);
+      document.querySelector('[data-panel="details"]')?.getAttribute('aria-pressed') !== 'true' && document.querySelector('[data-panel="details"]')?.click();
+      document.querySelectorAll('#workspace-details details').forEach((d) => { if (d.textContent.includes('Drill results')) d.open = true; });
+    } catch (err) {
+      setStatus(`Safety check failed: ${err.message}`, true);
+      console.error(err);
+    } finally {
+      busy = false;
+      viewer.renderer.setAnimationLoop(() => viewer._tick());
+    }
+  }
+
+  function showCheck(a, s) {
+    const quake = $('sim-scenario').value === 'earthquake';
+    const pct = (n) => `${Math.round((100 * n) / a.runs)}%`;
+    let html = `<div class="verdict ${a.ok ? 'ok' : 'bad'}"><b>${a.ok ? 'Passes' : 'Does not pass'}</b><span>${a.runs} runs with different people${quake ? ' and damage' : ''}. ${quake ? 'Earthquake damage and injuries follow HAZUS for the chosen structure.' : 'A room passes when it stays tenable (C/VM2 limits at 2 m) longer than the last person needs to leave through it, in 95% of runs.'}</span></div>
+    <div id="sim-stats">
+      <div class="${a.evacuation.all_out_runs < a.runs ? 'bad' : ''}"><b>${Number.isFinite(a.evacuation.p95) ? mmss(a.evacuation.p95) : 'not all out'}</b><span>everyone out, 95% of runs</span></div>
+      <div><b>${Number.isFinite(a.evacuation.p50) ? mmss(a.evacuation.p50) : '–'}</b><span>everyone out, typical run</span></div>
+      <div class="${a.harmed.runs_with_harm ? 'bad' : ''}"><b>${pct(a.harmed.runs_with_harm)}</b><span>of runs with someone hurt or left inside (worst ${a.harmed.max})</span></div>
+      ${quake ? '' : `<div class="${a.over_limit.runs_with ? 'bad' : ''}"><b>${pct(a.over_limit.runs_with)}</b><span>of runs where someone breathes past the FED 0.3 limit</span></div>`}
+    </div>`;
+    if (!quake) {
+      const why = { visibility: 'smoke too thick to see 10 m', 'toxic gases': 'toxic gases', heat: 'heat', 'radiant heat': 'radiant heat', flashover: 'flashover' };
+      const rows = a.rooms.filter((r) => r.used || r.aset != null).sort((x, y) => (x.margin95 ?? 1e9) - (y.margin95 ?? 1e9));
+      html += `<p id="sim-h3">Each room: safe for (ASET) against needed (RSET, 95%)</p><ul class="simlist">`;
+      for (const r of rows) {
+        const cls = r.margin95 == null ? '' : r.margin95 < 0 ? 'bad' : r.margin95 < 60 ? 'warn' : '';
+        const tag = r.margin95 == null ? (r.aset == null ? 'stays safe' : 'nobody passes') : r.margin95 < 0 ? `${mmss(-r.margin95)} short` : `${mmss(r.margin95)} spare`;
+        const detail = `${r.aset == null ? 'tenable throughout' : `untenable at ${mmss(r.aset)} (${why[r.aset_cause] || r.aset_cause})`}${r.rset95 != null ? `, last person through at ${mmss(r.rset95)}` : ''}${r.p_fail ? `, too late in ${pct(r.p_fail * a.runs)} of runs` : ''}`;
+        html += `<li class="${cls}"><span>${esc(r.name)}</span><span class="tag ${cls || 'ok'}">${tag}</span><small>${detail}</small></li>`;
+      }
+      html += '</ul>';
+      if (a.fire) html += `<p class="simnote">Design fire: ${a.fire.peak_kw >= 1000 ? `${(a.fire.peak_kw / 1000).toFixed(1)} MW` : `${a.fire.peak_kw} kW`} peak${a.fire.alarm_s != null ? `, alarm at ${mmss(a.fire.alarm_s)}` : ', no automatic alarm'}${a.fire.sprinkler_s != null ? `, sprinkler at ${mmss(a.fire.sprinkler_s)}` : ''}${a.fire.flashover_s != null ? `, flashover at ${mmss(a.fire.flashover_s)}` : ''}.</p>`;
+    } else if (a.quake) {
+      const d = a.quake;
+      html += `<p id="sim-h3">Building damage over the runs (HAZUS)</p><ul class="simlist">${['none', 'slight', 'moderate', 'extensive', 'complete'].map((k) => `<li><span>${k[0].toUpperCase() + k.slice(1)}</span><span>${pct(d.states[k] || 0)}</span></li>`).join('')}<li class="${d.collapsed ? 'bad' : ''}"><span>Collapse</span><span>${pct(d.collapsed)}</span></li></ul>
+      <p class="simnote">Injuries per run on average: ${d.severity.map((n, k) => `${n.toFixed(1)} severity ${k + 1}`).join(', ')} (1 treated and released, 2 hospital, 3 life-threatening, 4 dead).</p>`;
+    }
+    // why people did not get out: by who they are, with the likely reason
+    const lost = Object.entries(a.profiles || {}).filter(([, v]) => v.people - v.out > 0.05);
+    if (lost.length) {
+      html += `<p id="sim-h3">Who did not get out (average per run)</p><ul class="simlist">`;
+      for (const [p, v] of lost) {
+        const why = [v.injured && `${v.injured} injured`, v.overcome && `${v.overcome} overcome by smoke or heat`, v.assist && `${v.assist} waiting for help at the stairs`, v.trapped && `${v.trapped} shut in`].filter(Boolean).join(', ');
+        const hint = p === 'wheelchair' && v.trapped && a.narrow_doors.length ? ` Doors under 0.75 m stop wheelchairs: ${a.narrow_doors.join(', ')}.` : '';
+        html += `<li class="bad"><span>${esc(PROFILES[p]?.label || p)}</span><span class="tag bad">${(v.people - v.out).toFixed(1)} of ${v.people}</span><small>${why}.${hint}</small></li>`;
+      }
+      html += '</ul>';
+      if (quake && a.doors_jammed) html += `<p class="simnote">Doors jammed by the shaking: ${a.doors_jammed} per run on average; people behind them are shut in.</p>`;
+    }
+    $('sim-out').innerHTML = html;
   }
 
   async function worst() {
@@ -150,15 +257,18 @@ export function initSim({ viewer, getSite, setStatus }) {
       const [n, k] = names.get(id) || [id, 1];
       return esc(seen.get(n) > 1 ? `${n} (${k})` : n);
     };
-    const harmed = m.overcome + m.trapped;
+    if (r.quake) return showQuake(r, s, doorName);
+    const harmed = m.overcome + m.trapped + m.assist;
     const where = r.fire.zone ? zname.get(r.fire.zone) : 'the picked spot';
     let html = `<p>Sample drill exit policy: D9 only. D1 (loading shutter) and D11 (pending review) are excluded. This is not exit certification.</p><div id="sim-stats">
       <div class="${m.all_out_s == null ? 'bad' : ''}"><b>${m.all_out_s == null ? `${m.out} of ${m.people}` : mmss(m.all_out_s)}</b><span>${m.all_out_s == null ? 'got out' : `everyone out (${m.people} people)`}</span></div>
       <div><b>${mmss(m.p95_out_s)}</b><span>95% out</span></div>
       <div class="${m.overcome ? 'bad' : ''}"><b>${m.overcome}</b><span>overcome by smoke or fire</span></div>
       <div class="${m.trapped ? 'bad' : ''}"><b>${m.trapped}</b><span>trapped, no way out</span></div>
+      ${m.assist ? `<div class="bad"><b>${m.assist}</b><span>waiting for help at the stairs${m.help_by_s != null ? `, help needed by ${mmss(m.help_by_s)}` : ''}</span></div>` : ''}
     </div>
     <p id="sim-h3">Rooms, fire in ${esc(where)}</p><ul class="simlist">`;
+    if (m.fire) html += `<p class="simnote">Alarm ${m.fire.alarm_s != null ? `at ${mmss(m.fire.alarm_s)}` : 'raised by hand'}, people warned ${m.fire.warned_s != null ? `at ${mmss(m.fire.warned_s)}` : 'too late'}${m.fire.sprinkler_s != null ? `, sprinkler at ${mmss(m.fire.sprinkler_s)}` : ''}${m.fire.flashover_s != null ? `, flashover at ${mmss(m.fire.flashover_s)}` : ''}. ${m.over_limit ? `${m.over_limit} breathed smoke past the FED 0.3 limit.` : ''}</p>`;
     const rows = m.zones.filter((z) => z.people || z.smoke_s != null).sort((a, b) => (a.margin_s ?? -1e9) - (b.margin_s ?? -1e9));
     for (const z of rows) {
       const lost = z.overcome + z.trapped;
@@ -178,7 +288,72 @@ export function initSim({ viewer, getSite, setStatus }) {
     html += `<p id="sim-h3">Exits used</p><ul class="simlist">`;
     for (const e of m.exits) html += `<li><span>${doorName(e.id)}</span><span>${e.people}</span>${e.fire_s != null && e.fire_s < (m.last_out_s ?? 0) ? `<small>fire reaches it at ${mmss(e.fire_s)}</small>` : ''}</li>`;
     html += '</ul>';
-    if (harmed) html += `<p style="color:var(--crit);font-size:13px;margin:8px 0 0">${harmed} ${harmed === 1 ? 'person did' : 'people did'} not get out. Shown in red (overcome) and amber (no way out) at the end of the playback.</p>`;
+    // how each kind of occupant fared: the slowest group sets the evacuation time
+    const groups = Object.entries(m.profiles || {}).filter(([, g]) => g.people);
+    if (groups.length > 1 || (groups[0] && groups[0][0] !== 'adult')) {
+      html += `<p id="sim-h3">Who got out</p><ul class="simlist">`;
+      for (const [p, g] of groups.sort((a, b) => (b[1].last_out_s ?? 1e9) - (a[1].last_out_s ?? 1e9))) {
+        const lost = g.overcome + g.trapped + g.assist;
+        const cls = lost ? 'bad' : '';
+        const tag = lost ? `${lost} not out` : `out by ${mmss(g.last_out_s)}`;
+        const detail = [`${g.out} of ${g.people} out`, g.assist && `${g.assist} waiting for help at the stairs`, g.trapped && `${g.trapped} with no way out`, g.overcome && `${g.overcome} overcome`].filter(Boolean).join(', ');
+        html += `<li class="${cls}"><span>${esc(PROFILES[p]?.label || p)}</span><span class="tag ${cls || 'ok'}">${tag}</span><small>${detail}</small></li>`;
+      }
+      html += '</ul>';
+    }
+    if (m.via_stairs) html += `<p style="font-size:13px;margin:8px 0 0;color:var(--muted)">${m.via_stairs} left the floor by the stairs.</p>`;
+    if (harmed) html += `<p style="color:var(--crit);font-size:13px;margin:8px 0 0">${harmed} ${harmed === 1 ? 'person did' : 'people did'} not get out. Shown in red (overcome), amber (no way out) and violet (waiting for help) at the end of the playback.</p>`;
+    $('sim-out').innerHTML = html;
+  }
+
+  // Earthquake results: what came down, who was hurt and how, who got out.
+  function showQuake(r, s, doorName) {
+    const m = r.metrics, q = m.quake, lost = m.injured + m.trapped + m.assist;
+    const zname = new Map(s.zones.map((z) => [z.id, z.name]));
+    let html = `<p>Sample drill exit policy: D9 only. D1 (loading shutter) and D11 (pending review) are excluded. This is not exit certification. Wall strengths are illustrative, not a structural assessment.</p><div id="sim-stats">
+      <div class="${m.all_out_s == null ? 'bad' : ''}"><b>${m.all_out_s == null ? `${m.out} of ${m.people}` : mmss(m.all_out_s)}</b><span>${m.all_out_s == null ? 'got out' : `everyone out (${m.people} people)`}</span></div>
+      <div class="${m.injured ? 'bad' : ''}"><b>${m.injured}</b><span>injured</span></div>
+      <div class="${m.trapped ? 'bad' : ''}"><b>${m.trapped}</b><span>shut in by rubble or jammed doors</span></div>
+      <div><b>${q.walls_down} of ${q.walls}</b><span>wall panels down</span></div>
+      ${m.assist ? `<div class="bad"><b>${m.assist}</b><span>waiting for help at the stairs</span></div>` : ''}
+    </div>
+    <p id="sim-h3">What came down</p><ul class="simlist">
+      <li><span>Wall panels</span><span class="tag ${q.walls_down ? 'warn' : 'ok'}">${q.walls_down}</span><small>out of ${q.walls} panels of up to 4 m</small></li>
+      <li><span>Doors jammed shut</span><span class="tag ${q.doors_jammed ? 'warn' : 'ok'}">${q.doors_jammed}</span>${q.doors_jammed ? `<small>${r.quake.events.filter((e) => e.type === 'door').map((e) => doorName(e.id)).join(', ')}</small>` : ''}</li>
+      <li><span>Tall furniture overturned</span><span class="tag ${q.furniture_down ? 'warn' : 'ok'}">${q.furniture_down}</span></li>
+    </ul>`;
+    if (m.injured) {
+      html += `<p id="sim-h3">How people were hurt</p><ul class="simlist">`;
+      for (const [n, label] of [[q.by_wall, 'Under a falling wall'], [q.by_furniture, 'Under falling furniture'], [q.by_fall, 'Fell while moving during the shaking']]) {
+        if (n) html += `<li class="bad"><span>${label}</span><span class="tag bad">${n}</span></li>`;
+      }
+      html += '</ul>';
+    }
+    // the case for "drop, cover, hold on": injury rates of those who ran and those who stayed
+    const cov = m.people - q.ran, pc = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '–');
+    html += `<p id="sim-h3">Ran or took cover during the shaking</p><ul class="simlist">
+      <li class="${q.injured_running ? 'bad' : ''}"><span>Ran at once</span><span class="tag ${q.injured_running ? 'bad' : 'ok'}">${pc(q.injured_running, q.ran)} hurt</span><small>${q.injured_running} of ${q.ran}</small></li>
+      <li class="${q.injured_covering ? 'bad' : ''}"><span>Took cover, then left</span><span class="tag ${q.injured_covering ? 'bad' : 'ok'}">${pc(q.injured_covering, cov)} hurt</span><small>${q.injured_covering} of ${cov}</small></li>
+    </ul>`;
+    const groups = Object.entries(m.profiles || {}).filter(([, g]) => g.people);
+    if (groups.length > 1 || (groups[0] && groups[0][0] !== 'adult')) {
+      html += `<p id="sim-h3">Who got out</p><ul class="simlist">`;
+      for (const [p, g] of groups) {
+        const bad = g.injured + g.trapped + g.assist;
+        html += `<li class="${bad ? 'bad' : ''}"><span>${esc(PROFILES[p]?.label || p)}</span><span class="tag ${bad ? 'bad' : 'ok'}">${bad ? `${bad} not out` : `out by ${mmss(g.last_out_s)}`}</span><small>${[`${g.out} of ${g.people} out`, g.injured && `${g.injured} injured`, g.trapped && `${g.trapped} shut in`, g.assist && `${g.assist} waiting at the stairs`].filter(Boolean).join(', ')}</small></li>`;
+      }
+      html += '</ul>';
+    }
+    const rows = m.zones.filter((z) => z.people);
+    if (rows.length) {
+      html += `<p id="sim-h3">Rooms</p><ul class="simlist">`;
+      for (const z of rows) {
+        const bad = z.people - z.out;
+        html += `<li class="${bad ? 'bad' : ''}"><span>${esc(zname.get(z.id) || z.id)}</span><span class="tag ${bad ? 'bad' : 'ok'}">${bad ? `${bad} not out` : `out by ${mmss(z.last_out_s)}`}</span><small>${z.people} ${z.people === 1 ? 'person' : 'people'}</small></li>`;
+      }
+      html += '</ul>';
+    }
+    if (lost) html += `<p style="color:var(--crit);font-size:13px;margin:8px 0 0">${lost} ${lost === 1 ? 'person did' : 'people did'} not get out: pink (injured), amber (shut in) and violet (waiting for help) at the end of the playback.</p>`;
     $('sim-out').innerHTML = html;
   }
 
@@ -189,7 +364,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     $('pl-clock').textContent = mmss(t);
     const n = layer.countsAt(t);
     guidance.playback(t, n);
-    $('pl-counts').innerHTML = `<i style="background:${PEOPLE_COLORS.waiting}"></i>${n.waiting} not moving yet<i style="background:${PEOPLE_COLORS.moving}"></i>${n.moving} on the way<i style="background:#2f9e5b"></i>${n.out} out${n.overcome ? `<i style="background:${PEOPLE_COLORS.overcome}"></i>${n.overcome} overcome` : ''}${n.trapped ? `<i style="background:${PEOPLE_COLORS.trapped}"></i>${n.trapped} trapped` : ''}`;
+    $('pl-counts').innerHTML = `<i style="background:${PEOPLE_COLORS.waiting}"></i>${n.waiting} not moving yet<i style="background:${PEOPLE_COLORS.moving}"></i>${n.moving} on the way<i style="background:#2f9e5b"></i>${n.out} out${n.overcome ? `<i style="background:${PEOPLE_COLORS.overcome}"></i>${n.overcome} overcome` : ''}${n.trapped ? `<i style="background:${PEOPLE_COLORS.trapped}"></i>${n.trapped} trapped` : ''}${n.assist ? `<i style="background:${PEOPLE_COLORS.assist}"></i>${n.assist} waiting for help` : ''}${n.injured ? `<i style="background:${PEOPLE_COLORS.injured}"></i>${n.injured} injured` : ''}`;
   }
   function play(on) {
     playing = on && !!layer.result;
@@ -209,6 +384,13 @@ export function initSim({ viewer, getSite, setStatus }) {
   }
 
   $('sim-run').addEventListener('click', () => run());
+  $('sim-check').addEventListener('click', check);
+  const scenario = () => {
+    document.body.dataset.scenario = $('sim-scenario').value;
+    if ($('sim-scenario').value === 'earthquake' && picking) { picking = false; $('sim-pick').setAttribute('aria-pressed', false); }
+  };
+  $('sim-scenario').addEventListener('change', scenario);
+  scenario();
   $('sim-worst').addEventListener('click', worst);
   $('sim-fire').addEventListener('change', () => { fireAt = null; });
   $('sim-pick').addEventListener('click', () => {

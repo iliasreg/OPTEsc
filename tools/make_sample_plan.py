@@ -5,7 +5,8 @@ there are room names, printed areas and thin machine outlines.
 
     python3 tools/make_sample_plan.py data/samples
 
-writes factory_plan.png (30 px/m), factory_plan.dxf (mm, layers A-WALL / A-DOOR / A-ANNO),
+writes factory_plan.png (30 px/m), factory_plan.dxf (mm, layers A-WALL / A-DOOR / A-ANNO,
+plus furniture blocks on A-FURN and a stair on A-FLOR-STRS, DXF only),
 factory_plan.pdf (1:100 on A2) and factory_truth.json (exact room areas and doors).
 """
 
@@ -57,6 +58,49 @@ MACHINES = [
     (24, 15, 4, 4),
     (30, 15, 4, 2),
 ]
+# DXF only: furniture as named blocks (name, width, depth, layer) placed at their centre
+# (x, y, rotation in degrees), and a straight stair to a mezzanine on A-FLOR-STRS.
+BLOCKS = {
+    "DESK": (1.6, 0.8),
+    "CHAIR": (0.5, 0.5),
+    "CABINET": (1.2, 0.45),
+    "TABLE": (1.8, 0.8),
+    "LOCKER": (3.0, 0.5),
+    "BENCH": (2.0, 0.4),
+    "RACK": (6.0, 1.0),
+}
+FURNITURE = [
+    ("DESK", 2.5, 2.2, 0),
+    ("CHAIR", 2.5, 3.1, 0),
+    ("DESK", 2.5, 6.6, 0),
+    ("CHAIR", 2.5, 7.5, 0),
+    ("CABINET", 0.45, 8.6, 90),
+    ("DESK", 7.5, 2.2, 0),
+    ("CHAIR", 7.5, 3.1, 0),
+    ("DESK", 7.5, 7.4, 0),
+    ("CHAIR", 7.5, 8.3, 0),
+    ("TABLE", 7.5, 15.0, 90),
+    ("TABLE", 7.5, 18.0, 90),
+    ("TABLE", 7.5, 21.0, 90),
+    ("CHAIR", 6.6, 15.0, 0),
+    ("CHAIR", 8.4, 15.0, 0),
+    ("CHAIR", 6.6, 18.0, 0),
+    ("CHAIR", 8.4, 18.0, 0),
+    ("CHAIR", 6.6, 21.0, 0),
+    ("CHAIR", 8.4, 21.0, 0),
+    ("LOCKER", 0.45, 15.5, 90),
+    ("LOCKER", 0.45, 19.5, 90),
+    ("BENCH", 2.4, 17.5, 90),
+    ("RACK", 29.0, 2.5, 0),
+    ("RACK", 29.0, 5.5, 0),
+]
+STAIR = (
+    11.0,
+    0.5,
+    14,
+    0.28,
+    1.2,
+)  # x, y of the first nosing, steps, going, width (along +x)
 
 
 def half(v, vertical):
@@ -236,7 +280,14 @@ def write_dxf(path):
 
     doc = ezdxf.new("R2010")
     doc.header["$INSUNITS"] = 4  # millimetres
-    for name, color in (("A-WALL", 7), ("A-DOOR", 3), ("A-ANNO", 2), ("A-EQPM", 8)):
+    for name, color in (
+        ("A-WALL", 7),
+        ("A-DOOR", 3),
+        ("A-ANNO", 2),
+        ("A-EQPM", 8),
+        ("A-FURN", 30),
+        ("A-FLOR-STRS", 4),
+    ):
         doc.layers.add(name, color=color)
     msp = doc.modelspace()
 
@@ -268,6 +319,33 @@ def write_dxf(path):
             [mm(x, y), mm(x + w, y), mm(x + w, y + h), mm(x, y + h)],
             close=True,
             dxfattribs={"layer": "A-EQPM"},
+        )
+    for name, (bw, bd) in BLOCKS.items():
+        blk = doc.blocks.new(name=name)
+        blk.add_lwpolyline(
+            [
+                (-bw * 500, -bd * 500),
+                (bw * 500, -bd * 500),
+                (bw * 500, bd * 500),
+                (-bw * 500, bd * 500),
+            ],
+            close=True,
+        )
+    for name, x, y, rot in FURNITURE:
+        # y flips between the plan and the DXF, so a rotation turns the other way
+        msp.add_blockref(
+            name, mm(x, y), dxfattribs={"layer": "A-FURN", "rotation": -rot}
+        )
+    sx, sy, steps, going, width = STAIR
+    for k in range(steps + 1):
+        msp.add_line(
+            mm(sx + k * going, sy),
+            mm(sx + k * going, sy + width),
+            dxfattribs={"layer": "A-FLOR-STRS"},
+        )
+    for yy in (sy, sy + width):
+        msp.add_line(
+            mm(sx, yy), mm(sx + steps * going, yy), dxfattribs={"layer": "A-FLOR-STRS"}
         )
     for name, x, y, area in labels():
         msp.add_text(
