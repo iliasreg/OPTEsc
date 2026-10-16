@@ -19,7 +19,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE_ID = "factory-demo-fr-v1"
-SCENARIOS = {"alarm", "smoke", "blocked_route", "assistance", "assembly"}
+SCENARIOS = {
+    "alarm",
+    "smoke",
+    "blocked_route",
+    "assistance",
+    "assembly",
+    "earthquake",
+    "earthquake_after",
+    "earthquake_aftershock",
+}
 NOTICE = "Curated fictional-site prototype templates, not professionally reviewed. Not for emergency use."
 MAX_BODY = 2048
 
@@ -46,7 +55,7 @@ def load_config(env_file=Path.home() / ".amd.env"):
         "AMD_MODEL": "Qwen3.8-27B",
     }
     try:
-        for line in env_file.read_text().splitlines():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
             parts = shlex.split(line, comments=True)
             if parts and parts[0] == "export":
                 parts = parts[1:]
@@ -134,8 +143,12 @@ class Service:
 
     def corpus(self):
         try:
-            chunks = json.loads((self.corpus_dir / "chunks.json").read_text())
-            actions = json.loads((self.corpus_dir / "actions.json").read_text())
+            chunks = json.loads(
+                (self.corpus_dir / "chunks.json").read_text(encoding="utf-8")
+            )
+            actions = json.loads(
+                (self.corpus_dir / "actions.json").read_text(encoding="utf-8")
+            )
             if (
                 not isinstance(chunks, list)
                 or not isinstance(actions, dict)
@@ -170,7 +183,9 @@ class Service:
 
     def binding(self):
         try:
-            value = json.loads((self.corpus_dir / "site_binding.json").read_text())
+            value = json.loads(
+                (self.corpus_dir / "site_binding.json").read_text(encoding="utf-8")
+            )
             if (
                 value["site_id"] != SITE_ID
                 or not isinstance(value["fingerprint"], str)

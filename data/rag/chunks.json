@@ -287,5 +287,95 @@
     ],
     "actions": [],
     "site_id": "factory-demo-fr-v1"
+  },
+  {
+    "id": "prefecture-earthquake",
+    "title": "Préfecture des Hautes-Alpes — Les consignes individuelles de sécurité (séisme)",
+    "section": "Pendant — indoors",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "text": "During shaking: remain where you are; indoors, shelter beneath solid furniture or near a load-bearing element, away from windows; protect the head with the arms. Original English summary of French official public guidance; not workplace-specific law.",
+    "kind": "guidance",
+    "tags": [
+      "earthquake"
+    ],
+    "actions": [
+      "quake_cover"
+    ]
+  },
+  {
+    "id": "company-Q1",
+    "title": "Atelier Rhône — fictional factory emergency plan",
+    "section": "Q1 — Earthquake drill",
+    "url": "/safety/factory-emergency-plan.md#q1",
+    "text": "During shaking, stay indoors. Shelter under sturdy furniture if available, protect your head with your arms, and keep away from windows. Do not run outside. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction.",
+    "kind": "company",
+    "tags": [
+      "earthquake",
+      "factory-demo-fr-v1"
+    ],
+    "actions": [
+      "quake_cover"
+    ],
+    "site_id": "factory-demo-fr-v1"
+  },
+  {
+    "id": "prefecture-earthquake_after",
+    "title": "Préfecture des Hautes-Alpes — Les consignes individuelles de sécurité (séisme)",
+    "section": "Après — aftershocks and falling hazards",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "text": "After the first shock, expect aftershocks; do not use lifts to leave a building; move away from anything that might still collapse; follow official instructions. Original English summary of French official public guidance; not workplace-specific law.",
+    "kind": "guidance",
+    "tags": [
+      "earthquake_after"
+    ],
+    "actions": [
+      "quake_after"
+    ]
+  },
+  {
+    "id": "company-Q2",
+    "title": "Atelier Rhône — fictional factory emergency plan",
+    "section": "Q2 — Earthquake drill",
+    "url": "/safety/factory-emergency-plan.md#q2",
+    "text": "After shaking stops, follow the instructor’s site procedure. Use only a confirmed usable exit; keep away from damaged walls and falling objects. Do not use lifts or re-enter without official authorisation. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction. Report a jammed exit and your location to the instructor. If no confirmed usable route exists, stop this software drill for instructor review. Do not follow the simulated agents through rubble or collapsed walls as real-world advice.",
+    "kind": "company",
+    "tags": [
+      "earthquake_after",
+      "factory-demo-fr-v1"
+    ],
+    "actions": [
+      "quake_after"
+    ],
+    "site_id": "factory-demo-fr-v1"
+  },
+  {
+    "id": "prefecture-earthquake_aftershock",
+    "title": "Préfecture des Hautes-Alpes — Les consignes individuelles de sécurité (séisme)",
+    "section": "Pendant — renewed shaking",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "text": "During shaking: stay where you are and protect your head. Outside, keep away from power lines and structures that might collapse. After the first shock, further shocks may occur. Original English summary of French official public guidance; not workplace-specific law.",
+    "kind": "guidance",
+    "tags": [
+      "earthquake_aftershock"
+    ],
+    "actions": [
+      "quake_aftershock"
+    ]
+  },
+  {
+    "id": "company-Q3",
+    "title": "Atelier Rhône — fictional factory emergency plan",
+    "section": "Q3 — Earthquake drill",
+    "url": "/safety/factory-emergency-plan.md#q3",
+    "text": "An aftershock is shaking the building. Protect your head and shelter where you are, away from windows and falling objects. If already outside, stay clear of buildings and overhead power lines. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction.",
+    "kind": "company",
+    "tags": [
+      "earthquake_aftershock",
+      "factory-demo-fr-v1"
+    ],
+    "actions": [
+      "quake_aftershock"
+    ],
+    "site_id": "factory-demo-fr-v1"
   }
 ]

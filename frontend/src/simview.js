@@ -2,7 +2,7 @@
 // layer that comes down from the ceiling as it thickens.
 import * as THREE from 'three';
 import { smokeAt, STATE } from './sim.js';
-import { projectionPlan, projectionDoorKind } from './drillevents.js';
+import { projectionPlan, projectionDoorKind, projectionCellClear, quakeProjectionShaking } from './drillevents.js';
 
 export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b', killed: '#4a1520' };
 const STATE_COLOR = {
@@ -322,7 +322,11 @@ export class SimLayer {
 
   updateProjections(t) {
     if (!this.result || !this.projectionsEnabled) return;
-    const bucket = Math.floor(t/2);
+    const events=this.result.quake?.events||[];
+    let lo=0,hi=events.length;
+    while(lo<hi){const mid=(lo+hi)>>>1;if(events[mid].t<=t)lo=mid+1;else hi=mid;}
+    const shaking=quakeProjectionShaking(this.result,t);
+    const bucket = this.result.quake ? `${lo}:${shaking}` : Math.floor(t/2);
     if (bucket !== this.projectionBucket || t < this.projectionTime) {
       this.projections.clear();
       this.projectionGeometry ||= new THREE.PlaneGeometry(1,1);
@@ -355,7 +359,8 @@ export class SimLayer {
           const grid=this.site.grid;
           return [-0.5,0,0.5].every(x=>[-0.5,0,0.5].every(y=>{
             const p=new THREE.Vector3(x,y,0).applyMatrix4(mesh.matrixWorld);
-            return grid.cells[Math.floor(p.z/grid.cell_m)]?.[Math.floor(p.x/grid.cell_m)]==='.';
+            const gx=Math.floor(p.x/grid.cell_m),gy=Math.floor(p.z/grid.cell_m),i=gy*grid.w+gx;
+            return grid.cells[gy]?.[gx]==='.' && projectionCellClear(this.result,i,t);
           }));
         };
         for(let n=0;n<8&&!fits();n++) mesh.scale.multiplyScalar(0.85);
@@ -364,10 +369,9 @@ export class SimLayer {
       this.projectionBucket = bucket;
     }
     // Withdraw a cached arrow immediately if its path changes before the next replan.
-    const hz = this.result.hazard;
     for (const mesh of this.projections.children) {
       const data=mesh.userData;
-      if (data.path) mesh.visible=data.fitsFloor && data.guards.every(i=>hz.fireT[i]>t+2 && smokeAt(hz,i,t)<0.1);
+      if (data.path) mesh.visible=!shaking && data.fitsFloor && data.guards.every(i=>projectionCellClear(this.result,i,t));
       else {
         const d=this.site.doors.find(d=>d.id===data.doorId), kind=projectionDoorKind(d,this.site,this.result,t);
         mesh.visible=!!kind && (data.surface==='floor' ? data.fitsFloor : this.viewer.wallHeight>=2.5);

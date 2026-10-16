@@ -250,6 +250,43 @@ class GuidanceTests(unittest.TestCase):
         self.assertEqual(result["error"], "insufficient_evidence")
         self.assertEqual(result["actions"], [])
 
+    def test_earthquake_real_corpus_phase_isolation_and_missing_evidence(self):
+        import shutil
+
+        corpus = MODULE.parents[1] / "data" / "rag"
+        for name in ("chunks.json", "actions.json", "site_binding.json"):
+            shutil.copy2(corpus / name, self.root / name)
+        infer = Mock(return_value={"action_ids": ["follow_marshal"]})
+        service = self.rag.Service(self.root, config={}, infer=infer)
+        reference = service.reference()
+        infer.assert_not_called()
+        expected = {
+            "earthquake": "quake_cover",
+            "earthquake_after": "quake_after",
+            "earthquake_aftershock": "quake_aftershock",
+        }
+        for scenario, aid in expected.items():
+            with self.subTest(scenario=scenario):
+                result = reference["scenarios"][scenario]
+                self.assertEqual([a["id"] for a in result["actions"]], [aid])
+                self.assertEqual(
+                    {c["kind"] for c in result["actions"][0]["citations"]},
+                    {"company", "guidance"},
+                )
+                request = dict(
+                    scenario=scenario,
+                    zone_id="Z1",
+                    site_id=self.rag.SITE_ID,
+                    site_fingerprint=reference["fingerprint"],
+                )
+                rejected = service.guidance(request)
+                self.assertEqual(rejected["error"], "invalid_selection")
+                self.assertEqual([a["id"] for a in rejected["actions"]], [aid])
+        chunks = json.loads((self.root / "chunks.json").read_text(encoding="utf-8"))
+        chunks = [c for c in chunks if c["id"] != "prefecture-earthquake"]
+        (self.root / "chunks.json").write_text(json.dumps(chunks))
+        self.assertEqual(service.reference()["scenarios"]["earthquake"]["actions"], [])
+
     def save(self):
         (self.root / "chunks.json").write_text(json.dumps(self.chunks))
         (self.root / "actions.json").write_text(json.dumps(self.actions))

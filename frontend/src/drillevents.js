@@ -95,17 +95,22 @@ function doorLabel(d, room) {
 }
 
 // Earthquake facts: the shaking, each wall that comes down and who it lands on, jammed doors,
-// toppled furniture. Scenario 'earthquake': no source-backed actions exist for it yet, so the
-// subtitle keeps the general instruction to follow official alarms and responders.
+// toppled furniture. Phase changes bypass subtitle holds so renewed shaking cannot retain
+// evacuation guidance.
 function quakeEvents(result, site) {
   const q = result.quake, events = [];
   const room = (id) => site.zones.find((z) => z.id === id)?.name || id;
   const rooms = (ids) => ids.map(room).join(' and ');
-  const add = (time, id, fact, zoneIds = [], doorIds = []) => events.push({ time, id, scenario: 'earthquake', zoneId: zoneIds[0] || null, fact, zoneIds, doorIds });
-  const strength = { moderate: 'A light', strong: 'A strong', severe: 'A very strong', extreme: 'An extreme' }[q.level] || 'An';
-  add(0, 'alarm', `${strength} earthquake: the ground shakes for about ${q.duration} seconds. Most people drop, take cover and hold on.`);
-  add(q.duration, 'shake-end', 'The shaking stops. People who took cover get up and leave.');
-  if (q.aftershock) add(q.aftershock.t, 'aftershock', 'An aftershock shakes the building again while people are leaving.');
+  const phaseAt = time => q.aftershock && time >= q.aftershock.t && time < q.aftershock.t + q.aftershock.duration*1.3
+    ? 'earthquake_aftershock' : time < q.duration*1.3 ? 'earthquake' : 'earthquake_after';
+  const add = (time, id, fact, zoneIds = [], doorIds = [], quakePhase = false) => events.push({ time, id, scenario: phaseAt(time), zoneId: zoneIds[0] || site.zones[0]?.id || null, fact, zoneIds, doorIds, quakePhase });
+  const strength = { moderate: 'A light', strong: 'A strong', severe: 'A very strong', extreme: 'An extreme' }[q.level] || `A ${String(q.label || '').toLowerCase()}`;
+  add(0, 'alarm', `${strength} earthquake: the ground shakes for about ${q.duration} seconds. Most people drop, take cover and hold on.`, [], [], true);
+  add(q.duration*1.3, 'shake-end', 'The shaking stops. People who took cover get up and leave. The building may still be unsafe.', [], [], true);
+  if (q.aftershock) {
+    add(q.aftershock.t, 'aftershock', 'An aftershock shakes the building again while people are leaving.', [], [], true);
+    add(q.aftershock.t+q.aftershock.duration*1.3, 'aftershock-end', 'The aftershock is over. More shocks and falling debris are still possible.', [], [], true);
+  }
   const where = (e) => (e.zones.length ? ` in ${rooms(e.zones)}` : '');
   const hitBy = new Map((q.hits || []).map((h) => [`${h.type}:${h.id}`, h]));
   const caught = (h) => {
@@ -141,7 +146,19 @@ export function eventAt(events, t) {
       || batch.findLast((e) => e.scenario === 'blocked_route') || batch[batch.length - 1];
     shownAt = nextAt;
   }
-  return current;
+  const phase=events.findLast(e=>e.quakePhase&&e.time<=t);
+  return phase && current?.scenario!==phase.scenario ? phase : current;
+}
+
+export function projectionCellClear(result, i, t) {
+  const hz=result.hazard;
+  return hz.fireT[i]>t+2 && smokeAt(hz,i,t)<0.1
+    && !(hz.blockT?.[i]<=t) && !(hz.rubbleT?.[i]<=t);
+}
+
+export function quakeProjectionShaking(result, t) {
+  const q=result.quake;
+  return !!q && (t<q.duration*1.3 || !!q.aftershock && t>=q.aftershock.t && t<q.aftershock.t+q.aftershock.duration*1.3);
 }
 
 export function projectionDoorKind(d, site, result, t) {
@@ -149,7 +166,7 @@ export function projectionDoorKind(d, site, result, t) {
   const cells=(d.cells||[]).filter(([x,y])=>x>=0&&y>=0&&x<site.grid.w&&y<site.grid.h).map(([x,y])=>y*site.grid.w+x);
   if(d.is_exit && !result.metrics.exits.some(e=>e.id===d.id)) return 'excluded';
   if(!cells.length || !n) return null;
-  if(cells.every(i=>hz.fireT[i]<=t+2)) return 'blocked';
+  if(cells.every(i=>hz.fireT[i]<=t+2 || hz.blockT?.[i]<=t || hz.rubbleT?.[i]<=t)) return 'blocked';
   if(cells.some(i=>smokeAt(hz,i,t)>=0.1)) return 'smoke';
   return d.is_exit ? 'exit' : null;
 }
@@ -160,7 +177,9 @@ export function projectionPlan(site, result, t) {
   const g = prepare({ ...site, evacuationExitIds: allowed });
   const hz = result.hazard, field = new Float64Array(g.w * g.h);
   // A conservative demo threshold, not a physical visibility or tenability standard.
-  routeField(g, hz, t, field, undefined, undefined, null, 0.1);
+  if(quakeProjectionShaking(result,t)) field.fill(Infinity);
+  else routeField(g, hz, t, field, undefined,
+    i=>[1,3,4].includes(g.kind[i])&&projectionCellClear(result,i,t),null,0.1);
   const point = i => [((i % g.w) + 0.5) * g.c, (Math.floor(i / g.w) + 0.5) * g.c];
   const arrows = [], signs = [], anchors = [];
   const floorNear = (x, y) => nearestWalkable(g, x, y);

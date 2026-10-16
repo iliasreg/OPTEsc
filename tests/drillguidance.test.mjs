@@ -157,3 +157,20 @@ test('opt-in cloud response after seek/stop cannot replace current facts or acti
   assert.doesNotMatch($('rag-action').textContent, /STALE/);
   g.stop(); await flush(); assert.equal($('drill-subtitle').hidden, true);
 });
+
+test('cloud cache cannot reuse a fire alarm instruction for an earthquake alarm', async()=>{
+ const $=dom(),s=site(),ref=await reference(s);ref.scenarios.earthquake={actions:[{...actions[0],text:'Local quake cover'}]};
+ const posts=[];
+ globalThis.fetch=async(url,opts)=>{
+  if(url==='/api/drill-reference')return {ok:true,json:async()=>ref};
+  const request=JSON.parse(opts.body);posts.push(request.scenario);
+  return {ok:true,json:async()=>({...request,mode:'model',actions:[{...actions[0],text:request.scenario==='alarm'?'Cloud fire evacuation':'Cloud quake cover'}]})};
+ };
+ const g=initDrillGuidance({getSite:()=>s});g.siteChanged();await flush();g.start(result(),s);
+ $('rag-enable').checked=true;$('rag-enable').listeners.change();await new Promise(r=>setTimeout(r,650));await flush();
+ assert.match($('rag-action').textContent,/Cloud fire/);
+ g.start({quake:{label:'Strong',pga:.3,duration:20,events:[]}},s);
+ assert.doesNotMatch($('rag-action').textContent,/Cloud fire/);
+ await new Promise(r=>setTimeout(r,650));await flush();
+ assert.deepEqual(posts,['alarm','earthquake']);assert.match($('rag-action').textContent,/Cloud quake cover/);g.stop();
+});

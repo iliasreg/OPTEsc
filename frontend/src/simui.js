@@ -10,7 +10,7 @@ import { DrillSound } from './drillsound.js';
 
 const $ = (id) => document.getElementById(id);
 // Bump when the simulation changes: the worker and the simulation it loads are fetched afresh.
-const WORKER_VERSION = '2026-10-17a';
+const WORKER_VERSION = '2026-10-17b';
 const mmss = (s) => { if (s == null) return '–'; const r = Math.round(s); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

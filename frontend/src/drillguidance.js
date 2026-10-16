@@ -82,10 +82,10 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
   }
   function modelRequest() {
     if (!active || !enabled.checked || !reference || !event?.zoneId) return;
-    // the cloud only selects among sourced actions; scenarios with none (earthquake) are not sent
+    // Send only scenarios with a local evidence-backed action bank.
     if (!reference.scenarios?.[event.scenario]) return;
     const token = generation, selected = event, boundSite = site;
-    const key = `${fingerprint}:${selected.id}`;
+    const key = `${fingerprint}:${selected.scenario}:${selected.id}`;
     const current = () => generation === token && active && enabled.checked && event === selected && getSite() === boundSite;
     if (cache.has(key)) { render(cache.get(key).actions, cache.get(key).mode); return; }
     timer = setTimeout(async () => {
@@ -153,7 +153,7 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
     active = false; invalidate(); event = null; spokenText = '';
     onHighlight(null, site);
     overlay.hidden = true; output.replaceChildren(); read.disabled = true;
-    $('rag-simulated').textContent = ''; status.textContent = 'Start a fire drill for automatic simulation subtitles.';
+    $('rag-simulated').textContent = ''; status.textContent = 'Start a drill for automatic simulation subtitles.';
   }
   enabled.addEventListener('change', () => { invalidate(); render(); modelRequest(); });
   read.addEventListener('click', () => {
