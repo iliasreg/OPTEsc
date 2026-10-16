@@ -95,7 +95,13 @@
   #player .clock { font-variant-numeric: tabular-nums; min-width: 52px; font-weight: 600; }
   #player .counts { color: var(--muted); font-size: 12px; white-space: nowrap; }
   #player .counts i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; vertical-align: -1px; }
-  body:has(#player:not([hidden])) .hint { bottom: 70px; }
+  body:has(#player:not([hidden])) .hint { display: none; }
+  #drill-subtitle { position: absolute; left: 18px; right: 18px; bottom: 78px; z-index: 3; pointer-events: none; background: rgba(16,22,29,.94); color: #fff; border-radius: 10px; padding: 12px 16px; font-size: 15px; line-height: 1.4; }
+  #drill-subtitle[hidden] { display: none; }
+  #rag-fact { font-weight: 650; }
+  #rag-action { margin-top: 4px; color: #e2edff; }
+  #rag-citations { margin-top: 5px; font-size: 11px; color: #b9c6d8; }
+  @media (max-width: 800px) { #drill-subtitle { bottom: 112px; font-size: 13px; padding: 8px 10px; } }
   @media (max-width: 800px) { #player { flex-wrap: wrap; } #player .counts { width: 100%; } }
   @media (max-width: 800px) {
     body { grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
@@ -104,6 +110,7 @@
     .hint { white-space: normal; width: calc(100% - 32px); text-align: center; }
   }
 </style>
+<link rel="stylesheet" href="./workspace.css">
 </head>
 <body data-tab="3d" data-mode="orbit">
 <aside>
@@ -146,6 +153,20 @@
       <button id="sim-pick" aria-pressed="false" title="Click a spot in the 3D view to start the fire there">Pick spot</button>
       <button id="sim-worst" title="Start a fire in every room and rank them">Find worst fire</button>
     </div>
+    <section id="drill-guidance" aria-labelledby="rag-title" style="margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px">
+      <h2 id="rag-title">Automatic drill subtitles</h2>
+      <p>Fictional-site instructor prototype, not real emergency advice. In a real emergency follow official alarms, trained responders and your approved site procedures.</p>
+      <label><input id="rag-enable" type="checkbox"> Enable cloud inference for this drill</label>
+      <p style="font-size:12px;color:var(--muted)">Subtitles follow the simulation automatically, without AI. Optional cloud requests send the event's zone ID, scenario and source excerpts through the local server. Credentials stay on the server.</p>
+      <div class="row" style="margin-top:8px">
+
+        <button id="rag-read" disabled>Read aloud</button>
+        <button id="rag-silence">Stop speech</button>
+      </div>
+      <p id="rag-status" role="status">Start a fire drill for automatic simulation subtitles.</p>
+      <p id="rag-simulated" style="font-size:12px;color:var(--muted)"></p>
+      <details><summary>Action sources and full drill phrases</summary><ol id="rag-instructions" style="padding-left:20px;overflow-wrap:anywhere"></ol></details>
+    </section>
     <div id="sim-out"></div>
   </section>
   <section>
@@ -186,6 +207,11 @@
   <div class="pane">
     <div id="view3d"><div id="crosshair"></div></div>
     <div id="dist-legend" class="view-only" hidden></div>
+    <div id="drill-subtitle" class="view-only" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <div id="rag-fact"></div>
+      <div id="rag-action"></div>
+      <div id="rag-citations"></div>
+    </div>
     <div id="player" class="view-only" hidden>
       <button id="pl-play" aria-label="Play">▶</button>
       <span class="clock" id="pl-clock">0:00</span>
@@ -202,5 +228,6 @@
   </div>
 </div>
 <script type="module" src="./src/main.js"></script>
+<script type="module" src="./src/workspace.js"></script>
 </body>
 </html>

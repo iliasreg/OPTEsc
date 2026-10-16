@@ -1,0 +1,100 @@
+{
+  "follow_marshal": {
+    "text": "Evacuate calmly under the drill marshal’s direction. Leave belongings behind.",
+    "citations": [
+      "company-P3",
+      "r4227-38"
+    ],
+    "scenarios": [
+      "alarm"
+    ],
+    "required": true
+  },
+  "keep_clear": {
+    "text": "Walk without pushing. Keep doorways clear.",
+    "citations": [
+      "company-P3",
+      "r4227-4"
+    ],
+    "scenarios": [
+      "alarm"
+    ]
+  },
+  "avoid_smoke": {
+    "text": "Do not enter smoke or pass the simulated fire. Tell the drill marshal where you are.",
+    "citations": [
+      "company-P4",
+      "inrs-smoke"
+    ],
+    "scenarios": [
+      "smoke"
+    ],
+    "required": true
+  },
+  "blocked_report": {
+    "text": "Report the blocked route and your location to the drill marshal. Do not improvise a route.",
+    "citations": [
+      "company-P4",
+      "r4227-4"
+    ],
+    "scenarios": [
+      "blocked_route"
+    ],
+    "required": true
+  },
+  "stop_drill": {
+    "text": "If no approved clear route is available, stop this software drill and contact the instructor.",
+    "citations": [
+      "company-P4",
+      "r4227-38"
+    ],
+    "scenarios": [
+      "smoke",
+      "blocked_route"
+    ],
+    "required": true
+  },
+  "assistance_request": {
+    "text": "Tell the drill marshal your location and the assistance you need. Follow your agreed assistance arrangement.",
+    "citations": [
+      "company-P5",
+      "r4227-38"
+    ],
+    "scenarios": [
+      "assistance"
+    ],
+    "required": true
+  },
+  "no_rescue": {
+    "text": "Do not improvise a rescue or enter an unverified refuge. Ask the drill marshal for help.",
+    "citations": [
+      "company-P5",
+      "r4227-38"
+    ],
+    "scenarios": [
+      "assistance"
+    ]
+  },
+  "assembly_check": {
+    "text": "At the designated assembly point, report to the attendance marshal and stay with your group.",
+    "citations": [
+      "company-P6",
+      "inrs-evacuation"
+    ],
+    "scenarios": [
+      "assembly"
+    ],
+    "required": true
+  },
+  "no_reentry": {
+    "text": "Report missing people and their last known location. Do not re-enter to search.",
+    "citations": [
+      "company-P6",
+      "inrs-evacuation"
+    ],
+    "scenarios": [
+      "assembly"
+    ],
+    "required": true
+  }
+}

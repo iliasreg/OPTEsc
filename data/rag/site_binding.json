@@ -1,0 +1,161 @@
+{
+  "site_id": "factory-demo-fr-v1",
+  "fingerprint": "c1e4f38eb46b7fd8063e4576c0d5ceb160612bdcd1e092585fa1be0ee861f448",
+  "zones": [
+    {
+      "id": "Z1",
+      "name": "Production Hall"
+    },
+    {
+      "id": "Z2",
+      "name": "Lockers"
+    },
+    {
+      "id": "Z3",
+      "name": "Canteen"
+    },
+    {
+      "id": "Z4",
+      "name": "Loading Bay"
+    },
+    {
+      "id": "Z5",
+      "name": "Office A"
+    },
+    {
+      "id": "Z6",
+      "name": "Office B"
+    },
+    {
+      "id": "Z7",
+      "name": "Corridor"
+    },
+    {
+      "id": "Z8",
+      "name": "Storage"
+    }
+  ],
+  "doors": [
+    {
+      "id": "D1",
+      "x": 38.65,
+      "y": 1.55,
+      "width_m": 4,
+      "is_exit": true,
+      "connects": [
+        "outside",
+        "Z4"
+      ]
+    },
+    {
+      "id": "D2",
+      "x": 6.65,
+      "y": 6.1,
+      "width_m": 0.9,
+      "is_exit": false,
+      "connects": [
+        "Z5",
+        "Z6"
+      ]
+    },
+    {
+      "id": "D3",
+      "x": 35.65,
+      "y": 6.15,
+      "width_m": 1,
+      "is_exit": false,
+      "connects": [
+        "Z4",
+        "Z8"
+      ]
+    },
+    {
+      "id": "D4",
+      "x": 11.65,
+      "y": 7.1,
+      "width_m": 0.9,
+      "is_exit": false,
+      "connects": [
+        "Z1",
+        "Z6"
+      ]
+    },
+    {
+      "id": "D5",
+      "x": 25.65,
+      "y": 8.25,
+      "width_m": 1.2,
+      "is_exit": false,
+      "connects": [
+        "Z1",
+        "Z8"
+      ]
+    },
+    {
+      "id": "D6",
+      "x": 8.1,
+      "y": 11.65,
+      "width_m": 0.9,
+      "is_exit": false,
+      "connects": [
+        "Z6",
+        "Z7"
+      ]
+    },
+    {
+      "id": "D7",
+      "x": 4.1,
+      "y": 13.65,
+      "width_m": 0.9,
+      "is_exit": false,
+      "connects": [
+        "Z2",
+        "Z7"
+      ]
+    },
+    {
+      "id": "D8",
+      "x": 9.1,
+      "y": 13.65,
+      "width_m": 0.9,
+      "is_exit": false,
+      "connects": [
+        "Z3",
+        "Z7"
+      ]
+    },
+    {
+      "id": "D9",
+      "x": 41.65,
+      "y": 16.15,
+      "width_m": 0.97,
+      "is_exit": true,
+      "connects": [
+        "outside",
+        "Z1"
+      ]
+    },
+    {
+      "id": "D10",
+      "x": 11.65,
+      "y": 18.25,
+      "width_m": 1.2,
+      "is_exit": false,
+      "connects": [
+        "Z1",
+        "Z3"
+      ]
+    },
+    {
+      "id": "D11",
+      "x": 6.12,
+      "y": 25.65,
+      "width_m": 0.9,
+      "is_exit": true,
+      "connects": [
+        "outside",
+        "Z2"
+      ]
+    }
+  ]
+}
