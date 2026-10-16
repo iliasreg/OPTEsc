@@ -45,3 +45,22 @@ test('projector concepts are surface meshes, toggleable, and disposed on reset',
     layer.clear();assert.equal(layer.projections.children.length,0);
   } finally {globalThis.document=previous;}
 });
+
+test('quake renderer replans on an event inside one time bucket, then restores on rewind',()=>{
+ const layer=new SimLayer({scene:new THREE.Scene(),wallHeight:2.6});
+ const previous=globalThis.document,ctx=new Proxy({}, {get:(o,k)=>o[k]||(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
+ globalThis.document={createElement:()=>({width:512,height:512,getContext:()=>ctx})};
+ try{
+ layer.site={grid:{w:9,h:5,cell_m:1,cells:['#########','#.......E','#.......#','#.......E','#########'],zone_ids:Array.from({length:5},()=>Array(9).fill(1))},zones:[{id:'Z1',centroid:[3.5,2.5]}],doors:[{id:'D9',x:8.5,y:1.5,along:'y',is_exit:true,width_m:1,connects:['Z1','outside'],cells:[[8,1]]},{id:'D1',x:8.5,y:3.5,along:'y',is_exit:true,width_m:1,connects:['Z1','outside'],cells:[[8,3]]}]};
+ const never=()=>new Float32Array(45).fill(Infinity);
+ layer.result={quake:{duration:0,events:[{t:4.5}]},metrics:{exits:[{id:'D9'},{id:'D1'}]},hazard:{fireT:never(),smokeT:never(),tau:never(),rubbleT:never(),blockT:never()}};
+ layer.result.hazard.blockT[17]=4.5;
+ layer.updateProjections(4.4);const first=layer.projections.children[0];
+ assert.ok(layer.projections.children.some(m=>m.userData.path?.at(-1)===17));
+ layer.updateProjections(4.5);assert.notEqual(layer.projections.children[0],first);
+ assert.ok(!layer.projections.children.some(m=>m.visible&&m.userData.path?.at(-1)===17));
+ assert.ok(layer.projections.children.some(m=>m.userData.doorId==='D9'&&m.userData.kind==='blocked'));
+ const unchanged=layer.projections.children[0];layer.updateProjections(7);assert.equal(layer.projections.children[0],unchanged,'no grid replan without changed damage');
+ layer.updateProjections(4.4);assert.ok(layer.projections.children.some(m=>m.userData.path?.at(-1)===17));layer.clear();
+ }finally{globalThis.document=previous;}
+});

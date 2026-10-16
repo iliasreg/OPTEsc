@@ -31,3 +31,11 @@ Legal numeric measurements are stored as reference chunks for traceability, not 
 The corpus contains original English factual summaries and links. It does not bundle INRS PDFs, illustrations or page copies. [INRS reuse terms](https://www.inrs.fr/footer/mentions-legales.html) restrict reproduction beyond private use and permit links; obtain permission before distributing INRS source material or a fuller derived corpus. Referenced guidance is not an INRS licence grant.
 
 The summaries are a curated snapshot, not a live legal feed. Before deployment, recheck source versions, changes in law and applicability with qualified personnel. Review the company plan and action templates together; changing a source alone must not silently change a safety instruction.
+
+## Earthquake guidance
+
+[Préfecture des Hautes-Alpes — Les consignes individuelles de sécurité](https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite), updated 24 November 2020; retrieved 2026-10-16T19:55:18.588860+00:00. Official public safety guidance, not legislation or an approved factory plan. The corpus contains original English summaries of the Pendant and Après sections. The SHA-256 of the retrieved DOM text and source URL are recorded in data/rag/sources.json.
+
+During shaking: stay where you are, protect your head, use sturdy cover, avoid windows; outside, avoid power lines and falling structures. Afterwards: expect aftershocks, avoid lifts and things that may collapse, follow official instructions. We omit utility-isolation tasks and do not approve any rubble crossing or re-entry. Site-specific conditions still require competent review.
+
+The Sécurité civile website blocked retrieval; it is not used as evidence. The Géorisques landing page was readable, but its poster instructions were not extracted, so it is not an action citation.

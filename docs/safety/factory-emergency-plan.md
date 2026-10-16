@@ -80,3 +80,31 @@ Record the drill date, scenario, attendance, assistance arrangements, alarm reco
 The service retrieves relevant French regulatory/guidance summaries and the matching company section. An AMD-hosted model selects from curated English reminder IDs. It cannot write new operational commands, choose a route, calculate a legal threshold, invent a citation or issue an all-clear. Mandatory scenario reminders survive model omissions. Invalid output and provider failures use clearly labelled fixed-text fallbacks.
 
 Every reminder is a prototype template, not professionally approved safety advice. Model availability is not a prerequisite for evacuation. The UI derives room-fire, smoke and door-blockage notices from the simulation at the current playback time. Scene facts and cited instructions remain distinct. Immediate source-backed subtitles do not wait for cloud inference; optional model selection sends the event's zone and scenario, not the floorplan or personal data.
+
+# Earthquake software-drill addendum
+
+Fictional procedures for the same exact geometry binding. Public French earthquake recommendations are guidance, not a new workplace compliance claim.
+
+<a id="q1"></a>
+
+## Q1 — Pendant — indoors
+
+During shaking, stay indoors. Shelter under sturdy furniture if available, protect your head with your arms, and keep away from windows. Do not run outside. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction.
+
+Official basis: [Préfecture des Hautes-Alpes](https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite).
+
+<a id="q2"></a>
+
+## Q2 — Après — aftershocks and falling hazards
+
+After shaking stops, follow the instructor’s site procedure. Use only a confirmed usable exit; keep away from damaged walls and falling objects. Do not use lifts or re-enter without official authorisation. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction. Report a jammed exit and your location to the instructor. If no confirmed usable route exists, stop this software drill for instructor review. Do not follow the simulated agents through rubble or collapsed walls as real-world advice.
+
+Official basis: [Préfecture des Hautes-Alpes](https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite).
+
+<a id="q3"></a>
+
+## Q3 — Pendant — renewed shaking
+
+An aftershock is shaking the building. Protect your head and shelter where you are, away from windows and falling objects. If already outside, stay clear of buildings and overhead power lines. This is a fictional software-drill template, not an inspected structural assessment. The instructor must confirm site procedures and usable exits. AI cannot approve rubble crossings, a shelter location, re-entry, or a route. Never investigate damage or isolate utilities on this assistant’s instruction.
+
+Official basis: [Préfecture des Hautes-Alpes](https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite).

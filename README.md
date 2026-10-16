@@ -46,6 +46,10 @@ Projected guidance is a visual concept: floor arrows, crossed-door warnings and 
 
 The fictional extinguisher near D9 has four simple wall-projected pictograms: pull pin, aim low, squeeze, sweep. Click the equipment in the scene to face the wall; there is no separate button, floating card or popup. The projection follows the same visibility toggle as the floor arrows. General USFA PASS guidance and INRS training context are linked in Setup. This does not replace hands-on training, the unit’s label or site procedures. The training steps remain visible during software drills; they are not an instruction to interrupt evacuation.
 
+Earthquake projections recalculate when walls collapse, furniture topples or doors jam. They avoid all current rubble and blocked cells, withdraw if no clear route remains, and restore on rewind. Evacuation arrows stay hidden during shaking and aftershocks. They do not certify a real route or direct anyone through collapsed walls.
+
+Earthquake subtitles also use the cited English phrase bank: shelter during shaking, conditional site-led movement after shaking, and renewed protection during aftershocks. Phase changes override subtitle holds and support rewind. French official guidance comes from the Préfecture des Hautes-Alpes, paired with the fictional factory plan; simulation damage does not certify usable exits or rubble crossings.
+
 ## Optional AI guidance
 
 The demo uses fixed, cited phrases by default. To let an AMD-hosted model select relevant phrases, add your key to `~/.amd.env`:

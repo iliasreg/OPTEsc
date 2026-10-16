@@ -78,5 +78,29 @@
     "retrieval": "browser DOM text",
     "sha256_retrieved_text": "f44497afeb804f8c61f57960fbf353297bacbde8edfe316d6dd6433cdfbb4dc9",
     "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "prefecture-earthquake",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "retrieved_at": "2026-10-16T19:55:18.588860+00:00",
+    "sha256_retrieved_text": "3dc50ddf89bbfa1f8153b4257ca3c23278b752d9e061f4ea71efd1686fa0bd9c",
+    "retrieval": "browser DOM text; page updated 24/11/2020",
+    "storage": "Original English summary only; source page remains online."
+  },
+  {
+    "id": "prefecture-earthquake_after",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "retrieved_at": "2026-10-16T19:55:18.588860+00:00",
+    "sha256_retrieved_text": "3dc50ddf89bbfa1f8153b4257ca3c23278b752d9e061f4ea71efd1686fa0bd9c",
+    "retrieval": "browser DOM text; page updated 24/11/2020",
+    "storage": "Original English summary only; source page remains online."
+  },
+  {
+    "id": "prefecture-earthquake_aftershock",
+    "url": "https://www.hautes-alpes.gouv.fr/Actions-de-l-Etat/Environnement-bruit-risques-naturels-et-technologiques/Risques-naturels-et-technologiques/Dossier-Departemental-des-Risques-Majeurs-DDRM/Les-risques-naturels/Seisme/Les-consignes-individuelles-de-securite",
+    "retrieved_at": "2026-10-16T19:55:18.588860+00:00",
+    "sha256_retrieved_text": "3dc50ddf89bbfa1f8153b4257ca3c23278b752d9e061f4ea71efd1686fa0bd9c",
+    "retrieval": "browser DOM text; page updated 24/11/2020",
+    "storage": "Original English summary only; source page remains online."
   }
 ]
