@@ -25,41 +25,48 @@ function harness() {
   const context = vm.createContext({
     $: id => elements[id], console: { error() {} },
     setStatus: (...args) => statuses.push(args),
-    loadDxf: (...args) => loaded.push(args),
-    loadSiteJson() {}, loadPdf() {}, openIfc() {}, loadImage() {},
-    URL: { createObjectURL() { throw new Error('Unexpected image read'); } },
+    loadDxf: async (...args) => loaded.push(['dxf', ...args]),
+    loadPdf: async (...args) => loaded.push(['pdf', args[1]]),
+    loadImage: async (...args) => loaded.push(['image', args[1]]),
+    loadSiteJson() {}, openIfc() {},
+    URL: { createObjectURL: () => 'blob:plan' },
+    PLAN_FILE: /\.(dxf|pdf|png|jpe?g|webp|bmp|gif)$/i,
   });
   vm.runInContext(main.slice(main.indexOf("$('file').addEventListener"), main.indexOf('async function loadSample')), context);
   return { listeners, statuses, loaded };
 }
+const send = (h, pathway, file) => (pathway === 'picker'
+  ? h.listeners['file:change']({ target: { files: [file], value: file.name } })
+  : h.listeners['main:drop']({ preventDefault() {}, dataTransfer: { files: [file] } }));
 
 for (const pathway of ['picker', 'drop']) {
-  test(`${pathway} rejects every non-DXF before reading, including Site JSON`, async () => {
-    for (const name of ['site.json', 'plan.pdf', 'plan.png', 'plan.jpg', 'plan.svg', 'plan.ifc', 'plan.dwg', 'plan.txt', 'dxf', 'plan.dxf.json', '']) {
+  test(`${pathway} rejects anything but a DXF, a PDF or an image, before reading`, async () => {
+    for (const name of ['site.json', 'plan.svg', 'plan.ifc', 'plan.dwg', 'plan.txt', 'dxf', 'plan.dxf.json', 'plan.pdf.exe', '']) {
       const h = harness();
       let reads = 0;
       const file = { name, type: 'image/png', text: async () => { reads++; return '{}'; }, arrayBuffer: async () => { reads++; return new ArrayBuffer(0); } };
-      if (pathway === 'picker') h.listeners['file:change']({ target: { files: [file], value: name } });
-      else h.listeners['main:drop']({ preventDefault() {}, dataTransfer: { files: [file] } });
+      send(h, pathway, file);
       await new Promise(resolve => setImmediate(resolve));
       assert.equal(reads, 0, name);
-      assert.deepEqual(h.statuses, [['Only DXF (.dxf) plans are supported.', true]], name);
+      assert.deepEqual(h.statuses, [['Open a plan as DXF, PDF or an image (PNG, JPG).', true]], name);
       assert.equal(h.loaded.length, 0);
     }
   });
-  test(`${pathway} reads case-insensitive DXF regardless of MIME`, async () => {
-    const h = harness();
-    const file = { name: 'Floor.DXF', type: '', text: async () => 'DXF text' };
-    if (pathway === 'picker') h.listeners['file:change']({ target: { files: [file], value: file.name } });
-    else h.listeners['main:drop']({ preventDefault() {}, dataTransfer: { files: [file] } });
-    await new Promise(resolve => setImmediate(resolve));
-    assert.deepEqual(h.loaded, [['DXF text', 'Floor']]);
+  test(`${pathway} reads DXF, PDF and images by their extension, whatever the MIME type`, async () => {
+    for (const [name, want] of [['Floor.DXF', ['dxf', 'DXF text', 'Floor']], ['plan.PDF', ['pdf', 'plan']], ['scan.png', ['image', 'scan']], ['photo.JPG', ['image', 'photo']], ['plan.jpeg', ['image', 'plan']]]) {
+      const h = harness();
+      send(h, pathway, { name, type: '', text: async () => 'DXF text', arrayBuffer: async () => new ArrayBuffer(4) });
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+      assert.deepEqual(h.loaded, [want], name);
+    }
   });
 }
 
-test('active import UI and loaders are DXF-only, exports remain', () => {
-  assert.match(html, /id="file"[^>]*accept="\.dxf"/);
-  assert.doesNotMatch(html, /value="(?:pdf|png)"|id="(?:p-ai|ai-row)"/);
-  assert.doesNotMatch(main, /loadImage|loadPdf|loadSiteJson|renderPdf|aiWallFinder|findWalls|readPlanText/);
+test('the plan picker offers DXF, PDF and images; the exports remain', () => {
+  assert.match(html, /id="file"[^>]*accept="\.dxf,\.pdf,\.png,\.jpg/);
+  assert.match(main, /loadPdf/);
+  assert.match(main, /loadImage/);
+  assert.doesNotMatch(main, /loadSiteJson|aiWallFinder|findWalls/);
   for (const id of ['export', 'export-ifc', 'check-ifc']) assert.ok(html.includes(`id="${id}"`));
 });

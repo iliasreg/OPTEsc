@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { smokeAt, STATE } from './sim.js';
 import { projectionPlan, projectionDoorKind, projectionCellClear, quakeProjectionShaking } from './drillevents.js';
+import { perceivedHazard, signScene, CAMERA } from './equipment.js';
 
 export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b', killed: '#4a1520' };
 const STATE_COLOR = {
@@ -111,6 +112,8 @@ export class SimLayer {
     this.clear();
     this.result = result;
     this.site = site;
+    // the projections follow what the cameras have seen, not the simulation's own knowledge
+    this.perceived = this.seen && this.seen.length === site.grid.w * site.grid.h ? { ...result, hazard: perceivedHazard(result.hazard, this.seen) } : null;
     const g = site.grid, c = g.cell_m, w = g.w, h = g.h;
     this.c = c; this.w = w; this.h = h;
     const N = result.people.length;
@@ -282,6 +285,11 @@ export class SimLayer {
     this.updateProjections(t);
   }
 
+  // cells the cameras see (equipment.js cameraView): projections react only to what is seen there
+  setPerception(seen) { this.seen = seen; }
+  // the projector plan (equipment.js): signs are drawn at its sign spots, as its projectors show them
+  setKit(plan, seen) { this.kit = plan; this.seen = seen; }
+
   setProjections(on) {
     this.projectionsEnabled = on;
     this.projections.visible = on;
@@ -294,16 +302,19 @@ export class SimLayer {
     const canvas = document.createElement('canvas'); canvas.width = surface==='wall'?1024:512; canvas.height = surface==='wall'?256:512;
     const ctx = canvas.getContext('2d');
     const green = kind === 'arrow' || kind === 'exit';
-    ctx.strokeStyle = ctx.fillStyle = green ? '#a1ffbf' : kind === 'smoke' ? '#ffe18a' : '#ff8880';
+    ctx.strokeStyle = ctx.fillStyle = green ? '#a1ffbf' : kind === 'smoke' || kind === 'cover' ? '#ffe18a' : '#ff8880';
     ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 18;
     ctx.lineWidth = 18; ctx.lineCap = 'round'; ctx.textAlign = 'center';
-    const text=({arrow:'DRILL',exit:'DRILL EXIT',excluded:'NOT AN EXIT',blocked:'ROUTE BLOCKED',smoke:'SMOKE'})[kind];
+    const text=({arrow:'DRILL',exit:'DRILL EXIT',excluded:'NOT AN EXIT',blocked:'ROUTE BLOCKED',smoke:'SMOKE',cover:'TAKE COVER'})[kind];
     if(surface==='wall') {
       ctx.font='bold 74px sans-serif'; ctx.fillText(`${green?'':'×  '}${text}`,512,156);
     } else {
     if (kind === 'arrow') {
       ctx.beginPath(); ctx.moveTo(256,65); ctx.lineTo(390,220); ctx.lineTo(307,220);
       ctx.lineTo(307,375); ctx.lineTo(205,375); ctx.lineTo(205,220); ctx.lineTo(122,220); ctx.closePath(); ctx.fill();
+    } else if (kind === 'cover') {
+      ctx.fillRect(120,150,272,26); ctx.fillRect(140,176,22,150); ctx.fillRect(350,176,22,150);
+      ctx.beginPath(); ctx.arc(256,250,34,0,Math.PI*2); ctx.fill(); ctx.fillRect(200,286,112,40);
     } else if (kind === 'exit') {
       ctx.strokeRect(160,70,190,235); ctx.beginPath(); ctx.moveTo(190,190); ctx.lineTo(320,190);
       ctx.moveTo(270,145); ctx.lineTo(320,190); ctx.lineTo(270,235); ctx.stroke();
@@ -322,15 +333,17 @@ export class SimLayer {
 
   updateProjections(t) {
     if (!this.result || !this.projectionsEnabled) return;
+    const R = this.perceived || this.result, lag = this.perceived ? CAMERA.delay : 0;
+    if (this.kit) { this.updateKitProjections(R, t); return; }
     const events=this.result.quake?.events||[];
     let lo=0,hi=events.length;
-    while(lo<hi){const mid=(lo+hi)>>>1;if(events[mid].t<=t)lo=mid+1;else hi=mid;}
+    while(lo<hi){const mid=(lo+hi)>>>1;if(events[mid].t+lag<=t)lo=mid+1;else hi=mid;}
     const shaking=quakeProjectionShaking(this.result,t);
     const bucket = this.result.quake ? `${lo}:${shaking}` : Math.floor(t/2);
     if (bucket !== this.projectionBucket || t < this.projectionTime) {
       this.projections.clear();
       this.projectionGeometry ||= new THREE.PlaneGeometry(1,1);
-      const plan = projectionPlan(this.site,this.result,t);
+      const plan = projectionPlan(this.site,R,t);
       for (const arrow of plan.arrows) {
         const mesh = new THREE.Mesh(this.projectionGeometry,this.projectionMaterial('arrow'));
         mesh.position.set(arrow.x,0.06,arrow.y); mesh.scale.set(1.53,2.34,1);
@@ -360,7 +373,7 @@ export class SimLayer {
           return [-0.5,0,0.5].every(x=>[-0.5,0,0.5].every(y=>{
             const p=new THREE.Vector3(x,y,0).applyMatrix4(mesh.matrixWorld);
             const gx=Math.floor(p.x/grid.cell_m),gy=Math.floor(p.z/grid.cell_m),i=gy*grid.w+gx;
-            return grid.cells[gy]?.[gx]==='.' && projectionCellClear(this.result,i,t);
+            return grid.cells[gy]?.[gx]==='.' && projectionCellClear(R,i,t);
           }));
         };
         for(let n=0;n<8&&!fits();n++) mesh.scale.multiplyScalar(0.85);
@@ -371,15 +384,59 @@ export class SimLayer {
     // Withdraw a cached arrow immediately if its path changes before the next replan.
     for (const mesh of this.projections.children) {
       const data=mesh.userData;
-      if (data.path) mesh.visible=!shaking && data.fitsFloor && data.guards.every(i=>projectionCellClear(this.result,i,t));
+      if (data.path) mesh.visible=!shaking && data.fitsFloor && data.guards.every(i=>projectionCellClear(R,i,t));
       else {
-        const d=this.site.doors.find(d=>d.id===data.doorId), kind=projectionDoorKind(d,this.site,this.result,t);
+        const d=this.site.doors.find(d=>d.id===data.doorId), kind=projectionDoorKind(d,this.site,R,t);
         mesh.visible=!!kind && (data.surface==='floor' ? data.fitsFloor : this.viewer.wallHeight>=2.5);
         if(kind) {mesh.material=this.projectionMaterial(kind,data.surface);data.kind=kind;}
         if(data.surface==='wall') mesh.position.y=this.viewer.wallHeight-0.32;
       }
     }
     this.projectionTime=t;
+    this.onProjections?.(this.projections.children, t);
+  }
+
+  // Signs at the plan's sign spots, each lit by its projector, showing what signScene says.
+  updateKitProjections(R, t) {
+    const scene = signScene(this.kit, this.site, R, t);
+    const key = scene.map((s) => `${s.show || ''}${s.dir ? Math.round(Math.atan2(s.dir[0], s.dir[1]) * 4) : ''}`).join('|');
+    if (key !== this.kitKey || this.viewer.wallHeight !== this.kitWall) {
+      this.kitKey = key; this.kitWall = this.viewer.wallHeight;
+      this.projections.clear();
+      this.projectionGeometry ||= new THREE.PlaneGeometry(1, 1);
+      const byId = new Map(this.kit.targets.map((x) => [x.id, x]));
+      const grid = this.site.grid;
+      for (const s of scene) {
+        const tg = byId.get(s.id);
+        if (!s.show || s.show === 'training' || !tg.projector) continue;
+        const mesh = new THREE.Mesh(this.projectionGeometry, this.projectionMaterial(s.show, tg.surface));
+        mesh.userData = { surface: tg.surface, kind: s.show, target: tg.id, projector: tg.projector };
+        if (tg.surface === 'wall') {
+          const [nx, ny] = tg.normal, door = this.site.doors.find((d) => d.id === tg.door);
+          mesh.rotation.y = Math.atan2(nx, ny);
+          mesh.position.set(tg.x, this.viewer.wallHeight - 0.32, tg.y);
+          mesh.scale.set(Math.min(1.7, (door?.width_m || 1) + 0.4), 0.6, 1);
+          mesh.visible = this.viewer.wallHeight >= 2.5;
+        } else {
+          mesh.position.set(tg.x, 0.06, tg.y);
+          mesh.rotation.x = -Math.PI / 2;
+          if (s.dir) mesh.rotation.set(-Math.PI / 2, 0, Math.atan2(-s.dir[0], -s.dir[1]));
+          if (s.show === 'arrow') mesh.scale.set(1.2, 1.8, 1); else mesh.scale.set(1.5, 1.3, 1);
+          // shrink until it lies on open floor
+          const fits = () => {
+            mesh.updateMatrixWorld(true);
+            return [-0.5, 0, 0.5].every((a) => [-0.5, 0, 0.5].every((b) => {
+              const p = new THREE.Vector3(a, b, 0).applyMatrix4(mesh.matrixWorld);
+              return grid.cells[Math.floor(p.z / grid.cell_m)]?.[Math.floor(p.x / grid.cell_m)] === '.';
+            }));
+          };
+          for (let n = 0; n < 8 && !fits(); n++) mesh.scale.multiplyScalar(0.85);
+        }
+        this.projections.add(mesh);
+      }
+    }
+    this.projectionTime = t;
+    this.onProjections?.(this.projections.children, t);
   }
 
   // counts at time t for the playback readout
