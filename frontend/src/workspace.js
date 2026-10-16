@@ -1,7 +1,8 @@
+import { readTheme, applyTheme } from './theme.js';
 const $ = (s) => document.querySelector(s);
 const body=document.body,legacy=$('aside');
 const toolbar=document.createElement('header');toolbar.id='workspace-toolbar';
-toolbar.innerHTML='<div class="workspace-brand">OPTEsc</div><span class="workspace-notice">Software drill · not emergency guidance</span><nav aria-label="Workspace panels"><button data-panel="setup">Setup</button><button data-panel="details">Results</button><button data-panel="view">View</button></nav>';
+toolbar.innerHTML='<div class="workspace-brand"><img src="./assets/logo-optesc-white.png" alt="OPTEsc" width="112" height="68"></div><nav aria-label="Workspace panels"><button data-panel="setup">Setup</button><button data-panel="details">Results</button><button data-panel="view">View</button></nav>';
 body.prepend(toolbar);
 const panel=document.createElement('aside');panel.id='workspace-panel';
 panel.innerHTML='<div class="workspace-panel-head"><h1 id="workspace-panel-title">Setup</h1><button id="workspace-close" aria-label="Close panel">Close</button></div>';
@@ -9,7 +10,13 @@ const sections={};
 for(const id of ['setup','details','view']){const e=document.createElement('div');e.id='workspace-'+id;e.className='workspace-section';sections[id]=e;panel.append(e);}
 body.append(panel);
 function group(title,nodes){const section=document.createElement('section');section.className='workspace-group';const heading=document.createElement('h2');heading.textContent=title;section.append(heading,...nodes);return section;}
-toolbar.append($('#sim-run'),$('#status'));
+const actions=document.createElement('div');actions.className='workspace-actions';
+const themeButton=document.createElement('button');themeButton.id='theme-toggle';themeButton.type='button';
+actions.append(themeButton,$('#sim-run'));toolbar.append(actions,$('#status'));
+let storage=null;try{storage=window.localStorage;}catch{}
+const setTheme=theme=>applyTheme(document.documentElement,toolbar.querySelector('.workspace-brand img'),themeButton,theme,storage);
+setTheme(readTheme(storage));
+themeButton.addEventListener('click',()=>setTheme(document.documentElement.dataset.theme==='light'?'dark':'light'));
 const setup=document.createElement('section');setup.id='simple-sim';
 setup.append($('.pick-scenario'),$('#sim-fire').closest('label'));
 sections.setup.append(setup,$('#file').closest('label'));
