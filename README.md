@@ -3,7 +3,32 @@
 Open a floor plan in the browser and get a measured building: walls, rooms with net areas, doors with clear width and swing direction, exits, windows, the room-and-door graph, exit travel distances, a list of things to check, an explorable 3D model and an IFC file that opens in BIM tools. Then start a fire anywhere and watch the building empty: flames, a smoke layer that comes down from the ceiling, and every person finding their way out.
 
 
-Everything runs locally in the browser (CPU). No server, no GPU, no upload.
+The plan reader and simulation run locally in the browser (CPU). The optional drill-guidance prototype below uses a local server and opt-in AMD cloud inference.
+
+## English drill guidance — French reference corpus
+
+Run `./run.sh` from the repository, then open http://localhost:8767. Python 3.10+ is sufficient; the guidance service uses only the standard library. Use `./run.sh 9000` for another port, or set `PYTHON` to your conda environment's Python executable.
+
+The server reads `API_KEY` from `~/.amd.env`. Defaults: `AMD_BASE_URL=https://developer.amd.com.cn/radeon/api/v1`, `AMD_MODEL=Qwen3.8-27B`. Environment variables or values in that file override the defaults. Never put the key in frontend code. The server binds to localhost only.
+
+1. Keep the default DXF sample loaded and click **Run fire drill** in the top bar. The compact sidebar shows one section at a time: **Setup**, **Details** or **View**. Setup contains drill parameters, collapsed building/import controls and guidance/audio settings; Details contains checks, results, room measurements and exports; View contains camera and plan-editing controls.
+2. Watch subtitles inside the scene: the fire's room, room smoke and blocked doors update with playback. There is no instruction request button.
+3. Source-backed instructions appear automatically beneath the simulated facts, with citations. Optional cloud inference can select phrases but never delays the initial subtitle.
+4. **Read aloud** speaks the displayed subtitle only when clicked; speech availability depends on the browser.
+
+Subtitles follow the simulation clock, including seeking backwards. A blocked-door notice uses the simulation's fire exclusion rule, not queues or a language-model guess. These are simulated events, not sensor readings. Changing or closing the drill clears stale guidance. The company plan is bound to the sample's grid, room identifiers and doors; other buildings receive factual simulation notices without this fictional company's instructions.
+
+This is a bounded lexical RAG: retrieve indexed French legal/INRS summaries and fictional company-plan sections, then ask Qwen to select supported action IDs. Server-side checks render only fixed draft phrases with stored citations; the model cannot write routes, invent exits, or suppress required reminders. The panel distinguishes real model selection from deterministic fallback. The provider can take tens of seconds; requests time out after 60 seconds. Missing evidence produces no advice.
+
+Cloud requests contain the event zone/scenario and relevant excerpts, not the floorplan geometry or credentials. Cloud inference is off by default; local source-backed subtitles remain automatic. No embeddings, vector database or model download is needed.
+
+- [Fictional factory emergency plan](docs/safety/factory-emergency-plan.md)
+- [French sources, measurements, scope and reuse limits](docs/safety/french-sources.md)
+- `data/rag/`: source metadata, searchable summaries, action bank and sample binding.
+- Offline tests: `python3 -m unittest discover -s tests -p 'test_drill_rag.py'` and `node --test tests/sim.test.mjs tests/drillguidance.test.mjs`.
+
+Not an approved emergency system or a French compliance assessment. Existing geometry warnings still use the application's UK/NFPA heuristics; this feature does not replace them with a French compliance engine. The sample's shutter exit and inward-opening exit remain unresolved. No real assembly location, accessibility route or staff role has been verified. A qualified site review is required before real-world use.
+
 
 ## Run locally
 

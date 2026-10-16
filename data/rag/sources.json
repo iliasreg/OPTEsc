@@ -1,0 +1,82 @@
+[
+  {
+    "id": "r4227-4",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-4",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "f1925a5f0c719f199c196cff105209be183f47184abe3043fceaa97b8dfe2cbb",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-5",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-5",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "1bfabc12ccd4c7a123336e17c50bb2057a8cb5df0b680862679c299e2b5cd663",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-6",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-6",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "06f613eb6935cf193c7b03a56d94fc93153a84bd465f11c29e000645d23b78d2",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-34",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-34",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "3ea3fa69d7c8f086adc93a36ef3dd0a864f69bf843178a4e4c8873073e9e769f",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-37",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-37",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "d355c20eed516f794efd0bf726ae0472cb8a7caf7461e76605787f7a2a851098",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-38",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-38",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "8e2ae4f7b6f00326e6aa813e99cb45b1343870b683b22283fc40613c3f66f75c",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4227-39",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4227-39",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "ed4cfdfff86fcd4358ce6e7da92286f3c013b031f0ca412d3f6815bb4a37574c",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "r4216-11",
+    "url": "https://code.travail.gouv.fr/code-du-travail/r4216-11",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "06e0e4b611fbc5ca8e16dd4f0a0c38d4a2b03203119481a43aadbf2279fe721b",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "inrs-evacuation",
+    "url": "https://www.inrs.fr/risques/incendie-lieu-travail/evacuation-intervention-consignes-securite.html",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "d5a25df16bbb518cdf2c963b46fb69a0b385f483628ddc23a63d26200e40e2ed",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  },
+  {
+    "id": "inrs-legal",
+    "url": "https://www.inrs.fr/footer/mentions-legales.html",
+    "retrieved_at": "2026-10-16T09:34:33.105592+00:00",
+    "retrieval": "browser DOM text",
+    "sha256_retrieved_text": "f44497afeb804f8c61f57960fbf353297bacbde8edfe316d6dd6433cdfbb4dc9",
+    "storage": "Original English summaries only; full source pages are not bundled."
+  }
+]

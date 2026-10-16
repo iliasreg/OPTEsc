@@ -1,6 +1,7 @@
 // The "Fire drill" panel: start a fire, play it back in 3D and read what happened.
 import { SimLayer, PEOPLE_COLORS } from './simview.js';
 import { simulate, worstFire } from './sim.js';
+import { initDrillGuidance } from './drillguidance.js';
 
 const $ = (id) => document.getElementById(id);
 const mmss = (s) => { if (s == null) return '–'; const r = Math.round(s); return `${Math.floor(r / 60)}:${String(r % 60).padStart(2, '0')}`; };
@@ -8,6 +9,8 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 export function initSim({ viewer, getSite, setStatus }) {
   const layer = new SimLayer(viewer);
+  const guidance = initDrillGuidance({ getSite });
+  let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
   let picking = false, playing = false, last = 0, busy = false;
   let worker = null, nextId = 1, noWorker = false;
@@ -53,6 +56,7 @@ export function initSim({ viewer, getSite, setStatus }) {
 
   function siteChanged() {
     stop();
+    guidance.siteChanged();
     layer.clear();
     $('player').hidden = true;
     $('sim-out').innerHTML = '';
@@ -72,12 +76,16 @@ export function initSim({ viewer, getSite, setStatus }) {
     if (!s || busy) return;
     if (fire) { fireAt = null; $('sim-fire').value = fire; }
     if (!s.doors.some((d) => d.is_exit)) { setStatus('This plan has no exit yet. Paint a door on an outside wall in "Fix plan" first.', true); return; }
+    stop();
+    const token = revision;
     busy = true;
     setStatus('Running the fire drill…');
     const t0 = performance.now();
     try {
       const r = await call('run', simSite(s), opts());
+      if (token !== revision || s !== getSite()) return;
       layer.show(r, s);
+      guidance.start(r, s);
       showResult(r, s);
       $('player').hidden = false;
       $('pl-time').max = layer.duration;
@@ -85,6 +93,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       play(true);
       setStatus(`Fire drill worked out in ${Math.round(performance.now() - t0)} ms`);
     } catch (err) {
+      if (token !== revision) return;
       setStatus(`Fire drill failed: ${err.message}`, true);
       console.error(err);
     } finally { busy = false; }
@@ -93,11 +102,14 @@ export function initSim({ viewer, getSite, setStatus }) {
   async function worst() {
     const s = getSite();
     if (!s || busy) return;
+    stop();
+    const token = revision;
     busy = true;
     try {
       const o = opts();
       delete o.fire;
       const r = await call('worst', simSite(s), o, (done, total) => setStatus(`Fire in room ${done} of ${total}…`));
+      if (token !== revision || s !== getSite()) return;
       const names = new Map(s.zones.map((z) => [z.id, z.name]));
       const items = r.runs.map((x) => {
         const cls = x.harmed ? 'bad' : '';
@@ -106,6 +118,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       }).join('');
       busy = false;
       await run(r.runs[0].fire);
+      if (token + 1 !== revision || s !== getSite()) return;
       setStatus(`Tried a fire in each of ${r.runs.length} rooms with ${r.people} people. Showing the worst.`);
       $('sim-out').insertAdjacentHTML('beforeend', `<p id="sim-h3">Every fire start, worst first (click to replay)</p><ul class="simlist" id="sim-worst-list">${items}</ul>`);
       for (const li of $('sim-worst-list').children) {
@@ -171,6 +184,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     $('pl-time').value = t;
     $('pl-clock').textContent = mmss(t);
     const n = layer.countsAt(t);
+    guidance.playback(t, n);
     $('pl-counts').innerHTML = `<i style="background:${PEOPLE_COLORS.waiting}"></i>${n.waiting} not moving yet<i style="background:${PEOPLE_COLORS.moving}"></i>${n.moving} on the way<i style="background:#2f9e5b"></i>${n.out} out${n.overcome ? `<i style="background:${PEOPLE_COLORS.overcome}"></i>${n.overcome} overcome` : ''}${n.trapped ? `<i style="background:${PEOPLE_COLORS.trapped}"></i>${n.trapped} trapped` : ''}`;
   }
   function play(on) {
@@ -179,7 +193,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     $('pl-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
     if (playing) { if (layer.t >= layer.duration) seek(0); last = performance.now(); requestAnimationFrame(tick); }
   }
-  function stop() { play(false); }
+  function stop() { revision++; play(false); guidance.stop(); }
   function tick(now) {
     if (!playing) return;
     const dt = (now - last) / 1000;
@@ -199,7 +213,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     if (picking) setStatus('Click the floor in the 3D view where the fire starts');
   });
   $('pl-play').addEventListener('click', () => play(!playing));
-  $('pl-time').addEventListener('input', (e) => { play(false); seek(parseFloat(e.target.value)); });
+  $('pl-time').addEventListener('input', (e) => { play(false); guidance.invalidate(); seek(parseFloat(e.target.value)); });
   $('pl-close').addEventListener('click', () => { stop(); layer.clear(); $('player').hidden = true; });
 
   return {
