@@ -20,7 +20,39 @@ export class SimLayer {
     this.t = 0;
   }
 
+  highlight(event, site) {
+    if (event === this.cueEvent && site === this.cueSite) return;
+    if (this.cue) {
+      this.viewer.scene.remove(this.cue);
+      this.cue.geometry.dispose(); this.cue.material.dispose();
+    }
+    this.cue = null; this.cueEvent = event; this.cueSite = site;
+    if (!event || !site) return;
+    const { grid } = site, cells = [];
+    const zoneIds = event.zoneIds || [], doorIds = event.doorIds || [];
+    const zones = new Set(zoneIds.map(id => Number(id.slice(1))));
+    for (let y = 0; y < grid.h; y++) for (let x = 0; x < grid.w; x++) {
+      if (grid.cells[y][x] === '.' && zones.has(grid.zone_ids[y][x])) cells.push([x, y]);
+    }
+    for (const door of site.doors) if (doorIds.includes(door.id)) cells.push(...(door.cells || []));
+    if (!cells.length) return;
+    const isDoor = doorIds.length > 0, c = grid.cell_m;
+    const height = isDoor ? 2.2 : 0.025;
+    const geometry = new THREE.BoxGeometry(c, height, c);
+    const color = isDoor ? '#ffd43b' : event.scenario === 'smoke' ? '#b197fc' : '#ff922b';
+    const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: isDoor ? 0.65 : 0.28, depthTest: false, depthWrite: false });
+    this.cue = new THREE.InstancedMesh(geometry, material, cells.length);
+    this.cue.name = 'drill-subtitle-highlight';
+    this.cue.userData = { eventId: event.id, zoneIds, doorIds };
+    this.cue.renderOrder = 10;
+    const matrix = new THREE.Matrix4();
+    cells.forEach(([x,y],i) => this.cue.setMatrixAt(i, matrix.makeTranslation((x+0.5)*c, height/2+0.04, (y+0.5)*c)));
+    this.cue.instanceMatrix.needsUpdate = true;
+    this.viewer.scene.add(this.cue);
+  }
+
   clear() {
+    this.highlight(null, null);
     for (const o of [...this.group.children]) {
       this.group.remove(o);
       o.geometry?.dispose();

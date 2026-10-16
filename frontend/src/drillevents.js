@@ -3,8 +3,11 @@ export function drillEvents(result, site) {
   const { grid, zones, doors } = site, hz = result.hazard;
   const events = [];
   const room = (id) => { const z = zones.find((z) => z.id === id); return z ? `${z.name} (${z.id})` : id; };
-  const add = (time, id, scenario, zoneId, fact) => {
-    if (Number.isFinite(time)) events.push({ time: Math.max(0, time), id, scenario, zoneId, fact });
+  const add = (time, id, scenario, zoneId, fact, doorId = null) => {
+    if (Number.isFinite(time)) events.push({
+      time: Math.max(0, time), id, scenario, zoneId, fact,
+      zoneIds: !doorId && zoneId ? [zoneId] : [], doorIds: doorId ? [doorId] : [],
+    });
   };
   const origin = result.fire.zone;
   add(0, 'alarm', 'alarm', origin, `Fire starts in ${origin ? room(origin) : `the picked floor cell ${result.fire.cell}`}.`);
@@ -35,7 +38,7 @@ export function drillEvents(result, site) {
     const time = Math.max(...cells.map(([x, y]) => hz.fireT[y * grid.w + x] - 2));
     const ends = (d.connects || []).map((id) => id === 'outside' ? 'outside' : room(id)).join(' / ');
     add(time, `door:${d.id}`, 'blocked_route', (d.connects || []).find((id) => zones.some((z) => z.id === id)),
-      `${d.is_exit ? 'Exit' : 'Door'} ${d.id}${ends ? ` (${ends})` : ''} is blocked in navigation by fire proximity.`);
+      `${d.is_exit ? 'Exit' : 'Door'} ${d.id}${ends ? ` (${ends})` : ''} is blocked in navigation by fire proximity.`, d.id);
   }
   events.sort((a, b) => a.time - b.time || (a.id === 'alarm' ? -1 : b.id === 'alarm' ? 1 : a.id.localeCompare(b.id)));
   return events;

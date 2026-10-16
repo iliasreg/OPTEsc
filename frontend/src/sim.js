@@ -54,11 +54,15 @@ export function prepare(site) {
     const row = g.cells[y], zr = g.zone_ids[y];
     for (let x = 0; x < w; x++) { kind[y * w + x] = KIND_OF[row[x]] ?? 0; zone[y * w + x] = zr[x]; }
   }
+  const allowed = Array.isArray(site.evacuationExitIds) ? new Set(site.evacuationExitIds) : null;
   const doorOf = new Int32Array(w * h).fill(-1);
   const doors = (site.doors || []).map((d, k) => {
     for (const [x, y] of d.cells || []) doorOf[y * w + x] = k;
-    return { id: d.id, width: Math.max(0.5, d.width_m || 0.9), exit: !!d.is_exit, x: d.x, y: d.y };
+    return { id: d.id, width: Math.max(0.5, d.width_m || 0.9), exit: !!d.is_exit && (!allowed || allowed.has(d.id)), x: d.x, y: d.y };
   });
+  if (allowed) for (let i = 0; i < kind.length; i++) {
+    if (kind[i] === K.EXIT && !doors[doorOf[i]]?.exit) kind[i] = K.DOOR;
+  }
   const zones = site.zones.map((z) => ({ ...z, k: Number(z.id.slice(1)) }));
   const zoneByK = new Map(zones.map((z) => [z.k, z]));
   return { w, h, c, kind, zone, doorOf, doors, zones, zoneByK };

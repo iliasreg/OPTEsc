@@ -26,6 +26,16 @@ test('immediate actual room; no future event on forward or backward seeks', () =
   for (let t = 0; t < 100; t += 0.1) assert.ok(eventAt(events, t).time <= t);
 });
 
+test('events identify only the room or door named as the hazard target', () => {
+  const events = drillEvents(result(), site());
+  assert.deepEqual(events.find(e => e.id === 'alarm').zoneIds, ['Z1']);
+  assert.deepEqual(events.find(e => e.id === 'smoke:Z2').zoneIds, ['Z2']);
+  assert.deepEqual(events.find(e => e.id === 'fire:Z2').zoneIds, ['Z2']);
+  const door = events.find(e => e.id === 'door:D7');
+  assert.deepEqual(door.zoneIds, []);
+  assert.deepEqual(door.doorIds, ['D7']);
+});
+
 test('wide door uses ALL cells, exact fireT <= t+2; smoke and queues are not blocks', () => {
   const r = result(), events = drillEvents(r, site());
   const door = events.find((e) => e.id === 'door:D7');
@@ -102,6 +112,32 @@ test('automatic local subtitles, one reference fetch, no cloud calls per frame; 
   assert.match($('rag-status').textContent, /Company guidance unavailable/);
   assert.equal($('rag-instructions').children.length, 0);
   g.stop(); assert.equal($('drill-subtitle').hidden, true);
+});
+
+test('scene callback follows displayed coalesced subtitle, seeks, stop and site changes', () => {
+  const $ = dom(); let s = site(); const calls = [];
+  globalThis.fetch = async () => ({ ok: false });
+  const g = initDrillGuidance({ getSite: () => s, onHighlight: (event, boundSite) => calls.push({ event, boundSite }) });
+  const r = result(); r.hazard.fireT[2] = 3; r.hazard.fireT[3] = 4;
+  g.start(r, s);
+  assert.equal(calls.at(-1)?.event?.id, 'alarm');
+  g.playback(2);
+  assert.equal(calls.at(-1).event.id, 'alarm', 'door is hazardous but subtitle is still held');
+  g.playback(5);
+  assert.equal(calls.at(-1).event.id, 'door:D7');
+  assert.ok($('rag-fact').textContent.includes(calls.at(-1).event.fact));
+  assert.equal(calls.at(-1).boundSite, s);
+  g.playback(0);
+  assert.equal(calls.at(-1).event.id, 'alarm');
+  g.playback(-1);
+  assert.equal(calls.at(-1).event, null);
+  assert.equal($('drill-subtitle').hidden, true);
+  g.playback(0); g.stop();
+  assert.equal(calls.at(-1).event, null);
+  g.start(r, s); s = site(); g.siteChanged();
+  assert.equal(calls.at(-1).event, null);
+  g.playback(100);
+  assert.equal(calls.at(-1).event, null);
 });
 
 test('opt-in cloud response after seek/stop cannot replace current facts or actions', async () => {

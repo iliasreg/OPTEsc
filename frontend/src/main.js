@@ -1,32 +1,16 @@
 import { DEFAULTS, EDIT, readPlan, segment, toSite, analyzeSite } from './plan2grid.js';
 import { Viewer, TYPE_COLORS, DIST_COLORS, zoneColor } from './viewer3d.js';
 import { Editor } from './editor2d.js';
-import { renderDxf, renderPdf, textHints } from './vector.js';
+import { renderDxf, textHints } from './vector.js';
 import { siteToIfc } from './ifc.js';
-import { readPlanText } from './ocr.js';
-import { aiWallFinder, findWalls } from './aiwalls.js';
 import { initSim } from './simui.js';
 
 const $ = (id) => document.getElementById(id);
 const ZONE_TYPES = Object.keys(TYPE_COLORS);
 
-// The sample factory in three formats. For the image, room names and printed areas are
-// typed in here (an image has no text layer); DXF and PDF carry them as text.
-const px = (m) => 60 + m * 30; // sample image: 60 px margin, 30 px per metre
-const SAMPLES = {
-  png: {
-    url: './samples/factory_plan.png', widthM: 40.3,
-    hints: [
-      ['Office A', 'office', 2.5, 5, 46.7], ['Office B', 'office', 7.5, 5, 47.4], ['Corridor', 'corridor', 5, 11, 18.1],
-      ['Lockers', 'welfare', 2.5, 18, 56.2], ['Canteen', 'welfare', 7.5, 18, 57.1], ['Production hall', 'production', 20, 13, 563.5],
-      ['Storage', 'storage', 29, 4, 86.4], ['Loading bay', 'loading_bay', 37, 4, 50.7],
-    ].map(([name, type, x, y, a]) => ({ name, type, x: px(x), y: px(y), printedArea: a })),
-  },
-  dxf: { url: './samples/factory_plan.dxf' },
-  pdf: { url: './samples/factory_plan.pdf' },
-};
+const SAMPLES = { dxf: { url: './samples/factory_plan.dxf' } };
 
-const state = { source: null, base: null, edits: null, seg: null, site: null, plan: null, dist: null, name: 'Imported plan', image: null, kind: 'raster', pxPerM: 0, hints: [], unitsGuessed: null, scaleFrom: 'typed', scaleCount: 0, wallMask: null, wallsAi: null };
+const state = { source: null, base: null, edits: null, seg: null, site: null, plan: null, dist: null, name: 'Imported plan', image: null, kind: 'dxf', pxPerM: 0, hints: [], unitsGuessed: null, scaleFrom: 'typed', scaleCount: 0 };
 
 const viewer = new Viewer($('view3d'), { onPick: (id, point) => sim.pick(id, point) || selectZone(id) });
 const sim = initSim({ viewer, getSite: () => state.site, setStatus: (m, e) => setStatus(m, e) });
@@ -34,7 +18,7 @@ const editor = new Editor($('edit-canvas'), { onChange: () => resegment() });
 
 // ---------- loading ----------
 
-// Every plan source ends up as a canvas plus what we know about its scale and text.
+// Render the DXF to a canvas with its scale and text.
 function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], unitsGuessed = null, note = '' }) {
   state.source = cv;
   state.name = name;
@@ -43,12 +27,11 @@ function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], un
   state.pxPerM = pxPerM;
   state.hints = hints;
   state.textBoxes = textBoxes;
-  state.wallMask = null;
   state.unitsGuessed = unitsGuessed;
   state.site = null;
   $('p-width').disabled = pxPerM > 0;
   if (pxPerM > 0) state.scaleFrom = 'drawing';
-  // vector plans are sharp enough for a 10 cm grid; scanned images get 25 cm cells
+  // Use a 10 cm grid when the rendered drawing is sharp enough.
   $('p-cell').value = pxPerM > 0 ? Math.min(0.25, Math.max(0.1, Math.ceil(4 / pxPerM / 0.05) * 0.05)).toFixed(2) : 0.25;
   $('scale-note').textContent = pxPerM > 0 ? note : scaleNote();
   process();
@@ -65,95 +48,6 @@ function scaleNote() {
   }[state.scaleFrom] || '';
 }
 
-// Raster plans: 10 cm cells when the image is sharp enough, never coarser than 25 cm.
-function cellForScale(pxPerM) {
-  return Math.min(0.25, Math.max(0.1, Math.ceil(4 / pxPerM / 0.05) * 0.05));
-}
-
-// With no scale on an image, use what the plan itself says: printed room sizes first, door
-// widths second (doors are about 0.85 m), wall thickness last (about 0.2 m).
-function autoScale() {
-  if (state.pxPerM || state.scaleFrom === 'typed') return;
-  const median = (a) => { const b = [...a].sort((x, y) => x - y); return b[Math.floor(b.length / 2)]; };
-  for (let round = 0; round < 5; round++) {
-    const s = state.site;
-    const open = new Set((s.openings || []).flatMap((o) => o.between));
-    let rooms = s.zones.filter((z) => z.printed_area_m2 && !z.merged_labels && z.area_m2 > 0.5 && z.type !== 'outdoor');
-    // walled rooms are measured best, when there are enough of them for a median to outvote one misread size
-    if (rooms.filter((z) => !open.has(z.id)).length >= 3) rooms = rooms.filter((z) => !open.has(z.id));
-    const doors = s.doors.filter((d) => d.swing && d.swing.confidence >= 0.5 && d.width_m > 0.3 && d.width_m < 2);
-    let k;
-    if (rooms.length) { k = median(rooms.map((z) => Math.sqrt(z.printed_area_m2 / (z.printed_group_area_m2 ?? z.area_m2)))); state.scaleFrom = 'rooms'; state.scaleCount = rooms.length; }
-    else if (doors.length >= 2) {
-      // the opening in the wall, frame included, is about 0.9 m for a usual single door;
-      // move only part of the way each round, as the doors found change with the scale
-      k = (0.9 / median(doors.map((d) => d.width_m))) ** 0.7;
-      state.scaleFrom = 'doors'; state.scaleCount = doors.length;
-    }
-    else { state.scaleFrom = 'walls'; break; }
-    k = Math.min(2, Math.max(0.5, k));
-    if (Math.abs(k - 1) < 0.01) break;
-    const width = parseFloat($('p-width').value) * k;
-    $('p-width').value = width.toFixed(2);
-    $('p-cell').value = cellForScale(state.base.source.spanPx / width).toFixed(2);
-    process();
-  }
-  $('scale-note').textContent = scaleNote();
-  resegment();
-}
-
-async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length } = {}) {
-  setStatus('Reading plan…');
-  const img = new Image();
-  img.src = src;
-  await img.decode();
-  const scale = Math.min(1, 2200 / Math.max(img.naturalWidth, img.naturalHeight));
-  const cv = document.createElement('canvas');
-  cv.width = Math.round(img.naturalWidth * scale);
-  cv.height = Math.round(img.naturalHeight * scale);
-  const ctx = cv.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.drawImage(img, 0, 0, cv.width, cv.height);
-  state.scaleFrom = widthM ? 'typed' : 'walls';
-  if (widthM) $('p-width').value = widthM;
-  loadCanvas(cv, { name, kind: 'raster', hints: hints.map((h) => ({ ...h, x: h.x * scale, y: h.y * scale })) });
-  if (await aiWallFinder()) {
-    try {
-      setStatus('Finding walls with the AI wall finder…');
-      const r = await findWalls(cv);
-      state.wallMask = r.mask;
-      state.wallsAi = r;
-      if ($('p-ai').checked) process();
-    } catch (err) {
-      setStatus(`The AI wall finder failed (${err.message}). Walls come from the drawing.`, true);
-      console.error(err);
-    }
-  }
-  if (!widthM && state.base) {
-    // first guess: walls are about 0.2 m thick
-    const pxPerM = Math.max(5, state.base.source.wallPx / 0.2);
-    $('p-width').value = (state.base.source.spanPx / pxPerM).toFixed(2);
-    $('p-cell').value = cellForScale(pxPerM).toFixed(2);
-    process();
-  }
-  if (ocr) {
-    try {
-      const t = await readPlanText(cv, setStatus);
-      state.hints = t.labels;
-      state.textBoxes = t.textBoxes;
-      if (!state.pxPerM && state.scaleFrom !== 'typed') process();
-      else resegment();
-      const n = t.labels.filter((l) => l.name).length;
-      setStatus(`Read ${n} room name${n === 1 ? '' : 's'} on the plan.`);
-    } catch (err) {
-      setStatus(`Could not read the text on the plan (${err.message}). Rooms are unnamed.`, true);
-      console.error(err);
-    }
-  }
-  autoScale();
-}
-
 async function loadDxf(text, name) {
   setStatus('Reading DXF…');
   const r = renderDxf(text);
@@ -164,24 +58,12 @@ async function loadDxf(text, name) {
   });
 }
 
-async function loadPdf(buffer, name) {
-  setStatus('Reading PDF…');
-  const r = await renderPdf(buffer);
-  if (!r.pxPerM) state.scaleFrom = 'walls';
-  loadCanvas(r.canvas, {
-    name, kind: 'pdf', pxPerM: r.pxPerM, hints: textHints(r.texts, r.pxPerM || 30),
-    textBoxes: r.texts.map((t) => t.box),
-    note: r.scaleDenom ? `Scale 1:${r.scaleDenom} read from the drawing.` : '',
-  });
-  if (!r.pxPerM) autoScale();
-}
-
 function process() {
   if (!state.source) return;
   const cv = state.source;
   try {
     const t0 = performance.now();
-    state.base = readPlan(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height), { ...params(), textBoxes: state.textBoxes, wallMask: $('p-ai').checked ? state.wallMask : null, nameBoxes: (state.hints || []).filter((h) => h.box).map((h) => [h.box[0] - 2, h.box[1] - 2, h.box[2] + 2, h.box[3] + 2]) });
+    state.base = readPlan(cv.getContext('2d').getImageData(0, 0, cv.width, cv.height), { ...params(), textBoxes: state.textBoxes, nameBoxes: (state.hints || []).filter((h) => h.box).map((h) => [h.box[0] - 2, h.box[1] - 2, h.box[2] + 2, h.box[3] + 2]) });
     state.base.source.unitsGuessed = state.unitsGuessed;
     state.edits = new Uint8Array(state.base.w * state.base.h);
     state.carry = state.seg && state.site ? zoneAnchors() : null;
@@ -353,35 +235,6 @@ function cropPlan(src, base) {
   return cv;
 }
 
-// A site JSON (e.g. from the backend or an earlier export) becomes an editable grid again.
-function loadSiteJson(site) {
-  const g = site.grid;
-  const wall = new Uint8Array(g.w * g.h);
-  const edits = new Uint8Array(g.w * g.h);
-  const ink = new Float32Array(g.w * g.h);
-  g.cells.forEach((row, y) => {
-    for (let x = 0; x < g.w; x++) {
-      if (row[x] === '#') wall[y * g.w + x] = 1;
-      if (row[x] === 'W') ink[y * g.w + x] = 1; // re-detected as a window gap
-      if (row[x] === 'D' || row[x] === 'E') edits[y * g.w + x] = EDIT.DOOR;
-    }
-  });
-  const p = { ...DEFAULTS, ...(site.source?.params || {}), cellM: g.cell_m };
-  state.base = { w: g.w, h: g.h, wall, ink, params: p, source: { pxPerM: 1 / g.cell_m, cellPx: 1, originPx: [0, 0], scaleKnown: site.source?.scale_known } };
-  state.edits = edits;
-  state.source = null;
-  state.plan = null;
-  state.hints = [];
-  state.name = site.name;
-  state.image = site.source?.image || null;
-  state.kind = site.source?.kind || 'json';
-  state.site = site;
-  state.seg = null;
-  $('p-cell').value = g.cell_m;
-  resegment(true);
-  setStatus(`Loaded ${site.name}`);
-}
-
 async function openIfc(buffer, name) {
   setStatus('Opening IFC with web-ifc…');
   const { loadIfc } = await import('./ifcview.js');
@@ -529,15 +382,13 @@ $('file').addEventListener('change', (e) => {
   e.target.value = '';
 });
 function handleFile(f) {
+  if (!/\.dxf$/i.test(f.name)) {
+    setStatus('Only DXF (.dxf) plans are supported.', true);
+    return;
+  }
   const name = f.name.replace(/\.[^.]+$/, '');
-  const ext = f.name.split('.').pop().toLowerCase();
   const fail = (err) => { setStatus(`Could not read ${f.name}: ${err.message}`, true); console.error(err); };
-  if (ext === 'json') f.text().then((t) => loadSiteJson(JSON.parse(t))).catch(fail);
-  else if (ext === 'dxf') f.text().then((t) => loadDxf(t, name)).catch(fail);
-  else if (ext === 'pdf') f.arrayBuffer().then((b) => loadPdf(b, name)).catch(fail);
-  else if (ext === 'ifc') f.arrayBuffer().then((b) => openIfc(b, f.name)).catch(fail);
-  else if (f.type.startsWith('image/')) loadImage(URL.createObjectURL(f), name, null).catch(fail);
-  else setStatus('Use a DXF, PDF, PNG or JPG plan, a site JSON, or an IFC file.', true);
+  f.text().then((t) => loadDxf(t, name)).catch(fail);
 }
 const drop = $('main');
 drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
@@ -550,11 +401,12 @@ drop.addEventListener('drop', (e) => {
 });
 
 async function loadSample(kind) {
-  const s = SAMPLES[kind];
+  if (kind !== 'dxf') {
+    setStatus('Only DXF (.dxf) plans are supported.', true);
+    return;
+  }
   try {
-    if (kind === 'png') await loadImage(s.url, 'Sample factory', s.widthM, s.hints);
-    if (kind === 'dxf') await loadDxf(await (await fetch(s.url)).text(), 'Sample factory');
-    if (kind === 'pdf') await loadPdf(await (await fetch(s.url)).arrayBuffer(), 'Sample factory');
+    await loadDxf(await (await fetch(SAMPLES.dxf.url)).text(), 'Sample factory');
   } catch (err) { setStatus(`Could not load the sample: ${err.message}`, true); console.error(err); }
 }
 $('sample').addEventListener('change', (e) => loadSample(e.target.value));
@@ -565,12 +417,6 @@ for (const id of ['p-width', 'p-cell', 'p-door', 'p-filter']) {
   });
 }
 $('p-travel').addEventListener('change', () => resegment());
-$('p-ai').addEventListener('change', () => { if (state.wallMask) { process(); autoScale(); } });
-aiWallFinder().then((ai) => {
-  if (!ai) return;
-  $('ai-row').hidden = false;
-  $('ai-device').textContent = `(on ${ai.device})`;
-});
 $('p-height').addEventListener('input', (e) => viewer.setWallHeight(parseFloat(e.target.value)));
 $('t-overlay').addEventListener('change', (e) => viewer.setOverlay(e.target.checked));
 $('t-labels').addEventListener('change', (e) => viewer.setLabels(e.target.checked));
@@ -606,5 +452,5 @@ document.body.dataset.tab ||= '3d';
 document.body.dataset.mode ||= 'orbit';
 
 // expose for debugging and tests
-window.optesc = { state, sim, calibrate, viewer, editor, loadImage, loadDxf, loadPdf, loadSiteJson, loadSample, openIfc, siteToIfc };
+window.optesc = { state, sim, calibrate, viewer, editor, loadDxf, loadSample, siteToIfc };
 loadSample('dxf');

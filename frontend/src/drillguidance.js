@@ -14,13 +14,21 @@ export async function siteFingerprint(site) {
   return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+// Software-drill policy only: D1 is a shutter; D11 awaits review.
+export function drillExitIds(fingerprint) {
+  if (fingerprint !== 'c1e4f38eb46b7fd8063e4576c0d5ceb160612bdcd1e092585fa1be0ee861f448') {
+    throw new Error('No reviewed drill exit policy for this geometry. Reload the sample DXF; other plans need a site-specific exit policy.');
+  }
+  return ['D9'];
+}
+
 export const referenceMatches = (reference, fingerprint) => reference?.site_id === SITE_ID
   && typeof fingerprint === 'string' && reference.fingerprint === fingerprint;
 const validActions = (actions) => Array.isArray(actions) && actions.length && actions.every((a) =>
   typeof a.text === 'string' && a.text.trim() && Array.isArray(a.citations) && a.citations.length
   && a.citations.every((c) => c && ['id', 'title', 'section', 'url'].every((k) => typeof c[k] === 'string')));
 
-export function initDrillGuidance({ getSite }) {
+export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
   const enabled = $('rag-enable'), status = $('rag-status'), output = $('rag-instructions');
   const overlay = $('drill-subtitle'), fact = $('rag-fact'), action = $('rag-action'), read = $('rag-read');
   let active = false, events = [], event = null, site = null, reference = null, fingerprint = null;
@@ -36,8 +44,13 @@ export function initDrillGuidance({ getSite }) {
     cancelSpeech();
   }
   function render(actions = null, mode = '') {
-    if (!active || !event) return;
+    if (!active || !event) {
+      overlay.hidden = true; output.replaceChildren(); read.disabled = true; spokenText = '';
+      onHighlight(null, site);
+      return;
+    }
     overlay.hidden = false;
+    onHighlight(event, site);
     fact.textContent = `SIMULATION · ${event.time.toFixed(1)} s — ${event.fact}`;
     const local = reference?.scenarios?.[event.scenario]?.actions;
     const selected = validActions(actions) ? actions : validActions(local) ? local : [];
@@ -136,6 +149,7 @@ export function initDrillGuidance({ getSite }) {
   }
   function stop() {
     active = false; invalidate(); event = null; spokenText = '';
+    onHighlight(null, site);
     overlay.hidden = true; output.replaceChildren(); read.disabled = true;
     $('rag-simulated').textContent = ''; status.textContent = 'Start a fire drill for automatic simulation subtitles.';
   }
