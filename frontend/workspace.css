@@ -70,3 +70,15 @@ body[data-panel=""] #main { grid-column: 1; }
   #player { width: calc(100% - 24px); flex-wrap: nowrap; gap: 5px; }
   .hint { max-width: 90%; }
 }
+
+#workspace-internal { display:none !important; }
+#simple-sim .f { grid-template-columns:1fr; gap:8px; margin:0; }
+#workspace-setup > .btn { display:block; text-align:center; }
+.workspace-views { display:flex; gap:8px; }
+.workspace-views button { flex:1; }
+#workspace-view > .edit-only { display:flex; gap:8px; flex-wrap:wrap; }
+#workspace-view > .workspace-group h2, #workspace-details h2 { margin-bottom:12px; }
+#final-export { width:100%; }
+#orbit-hint[hidden], #walk-hint[hidden] { display:none !important; }
+
+#rag-citations a { color:inherit; pointer-events:auto; text-decoration:underline; }

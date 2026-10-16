@@ -308,33 +308,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       html += `<li class="${cls}"><span>${esc(z.name)}</span><span class="tag ${cls || (z.people ? 'ok' : '')}">${tag}</span><small>${detail}</small></li>`;
     }
     html += '</ul>';
-    if (m.bottlenecks.length) {
-      html += `<p id="sim-h3">Where people queued</p><ul class="simlist">`;
-      for (const b of m.bottlenecks) html += `<li><span>${doorName(b.id)}</span><span class="tag warn">up to ${b.max_queue} waiting</span><small>${Math.round(b.width_m * 100)} cm wide; ${b.people} people went through.</small></li>`;
-      html += '</ul>';
-    }
-    html += `<p id="sim-h3">Exits used</p><ul class="simlist">`;
-    for (const e of m.exits) html += `<li><span>${doorName(e.id)}</span><span>${e.people} people</span>${e.fire_s != null && e.fire_s < (m.last_out_s ?? 0) ? `<small>The fire reaches it at ${mmss(e.fire_s)}.</small>` : ''}</li>`;
-    html += '</ul>';
-    html += whoGotOut(m);
-    if (m.via_stairs) html += `<p class="simnote">${m.via_stairs} left the floor by the stairs.</p>`;
-    if (lost) html += `<p class="simnote" style="color:var(--crit)">At the end of the replay: red, overcome; amber, no way out; violet, waiting for help.</p>`;
-    const f = m.fire;
-    html += `<details class="tech"><summary>Technical details</summary>${policy}${f ? `<p>Design fire peak ${f.peak_kw >= 1000 ? `${(f.peak_kw / 1000).toFixed(1)} MW` : `${f.peak_kw} kW`}; detection ${f.alarm_s != null ? `at ${mmss(f.alarm_s)}` : 'by hand'}; occupants warned ${f.warned_s != null ? `at ${mmss(f.warned_s)}` : 'too late'}${f.sprinkler_s != null ? `; sprinkler at ${mmss(f.sprinkler_s)}` : ''}${f.flashover_s != null ? `; flashover at ${mmss(f.flashover_s)}` : ''}. ${m.over_limit} breathed smoke past FED 0.3. 95% out by ${mmss(m.p95_out_s)}.</p>` : ''}</details>`;
     $('sim-out').innerHTML = html;
-  }
-
-  // how each kind of occupant fared: the slowest group sets the evacuation time
-  function whoGotOut(m) {
-    const groups = Object.entries(m.profiles || {}).filter(([, g]) => g.people);
-    if (!(groups.length > 1 || (groups[0] && groups[0][0] !== 'adult'))) return '';
-    let html = `<p id="sim-h3">Who got out</p><ul class="simlist">`;
-    for (const [p, g] of groups.sort((a, b) => (b[1].last_out_s ?? 1e9) - (a[1].last_out_s ?? 1e9))) {
-      const gone = g.overcome + g.trapped + g.assist + (g.injured || 0) + (g.killed || 0);
-      const detail = [`${g.out} of ${g.people} out`, g.killed && `${g.killed} dead`, g.injured && `${g.injured} hurt`, g.overcome && `${g.overcome} overcome`, g.trapped && `${g.trapped} with no way out`, g.assist && `${g.assist} waiting for help at the stairs`].filter(Boolean).join(', ');
-      html += `<li class="${gone ? 'bad' : ''}"><span>${esc(PROFILES[p]?.label || p)}</span><span class="tag ${gone ? 'bad' : 'ok'}">${gone ? `${gone} not out` : `out by ${mmss(g.last_out_s)}`}</span><small>${detail}.</small></li>`;
-    }
-    return html + '</ul>';
   }
 
   // Earthquake results: who got out, who was hurt and how, what came down.
@@ -351,24 +325,6 @@ export function initSim({ viewer, getSite, setStatus }) {
       <div class="${m.all_out_s == null ? 'bad' : ''}"><b>${m.all_out_s == null ? `${m.out} of ${m.people}` : mmss(m.all_out_s)}</b><span>${m.all_out_s == null ? 'got out' : 'everyone is out'}</span></div>
       ${m.assist ? `<div class="bad"><b>${m.assist}</b><span>waiting for help at the stairs</span></div>` : ''}
     </div>`;
-    const hurt = [[q.by_wall, 'Under a falling wall'], [q.by_furniture, 'Under falling furniture'], [q.by_shaking, 'Fell or was hit during the shaking']].filter(([n]) => n);
-    if (hurt.length) {
-      html += `<p id="sim-h3">How people were hurt (all injuries, even minor)</p><ul class="simlist">`;
-      for (const [n, label] of hurt) html += `<li class="bad"><span>${label}</span><span class="tag bad">${n}</span></li>`;
-      html += '</ul>';
-    }
-    // the case for "drop, cover, hold on": injury rates of those who ran and those who stayed
-    const cov = m.people - q.ran, pc = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '–');
-    html += `<p id="sim-h3">Ran, or took cover?</p><ul class="simlist">
-      <li class="${q.injured_running ? 'bad' : ''}"><span>Ran during the shaking</span><span class="tag ${q.injured_running ? 'bad' : 'ok'}">${pc(q.injured_running, q.ran)} hurt</span><small>${q.injured_running} of ${q.ran} people</small></li>
-      <li class="${q.injured_covering ? 'bad' : ''}"><span>Took cover, then left</span><span class="tag ${q.injured_covering ? 'bad' : 'ok'}">${pc(q.injured_covering, cov)} hurt</span><small>${q.injured_covering} of ${cov} people</small></li>
-    </ul>
-    <p id="sim-h3">What came down</p><ul class="simlist">
-      <li><span>Walls</span><span class="tag ${q.walls_down ? 'warn' : 'ok'}">${q.walls_down} of ${q.walls} sections</span></li>
-      <li><span>Doors jammed shut</span><span class="tag ${q.doors_jammed ? 'warn' : 'ok'}">${q.doors_jammed}</span>${q.doors_jammed ? `<small>${r.quake.events.filter((e) => e.type === 'door').map((e) => doorName(e.id)).join(', ')}</small>` : ''}</li>
-      <li><span>Tall furniture fallen over</span><span class="tag ${q.furniture_down ? 'warn' : 'ok'}">${q.furniture_down}</span></li>
-    </ul>`;
-    html += whoGotOut(m);
     const rows = m.zones.filter((z) => z.people);
     if (rows.length) {
       html += `<p id="sim-h3">Rooms</p><ul class="simlist">`;
@@ -378,8 +334,6 @@ export function initSim({ viewer, getSite, setStatus }) {
       }
       html += '</ul>';
     }
-    if (lost) html += `<p class="simnote" style="color:var(--crit)">At the end of the replay: dark red, dead; pink, hurt; amber, shut in; violet, waiting for help.</p>`;
-    html += `<details class="tech"><summary>Technical details</summary>${policy}<p>HAZUS damage state: ${q.damage}${q.collapsed ? ', collapsed' : ''}; structure ${esc(q.building)}, seismic design ${esc(q.design)}. Injury severities 1–4: ${q.severity.join(', ')}. Which walls fall is illustrative, not a structural assessment.</p></details>`;
     $('sim-out').innerHTML = html;
   }
 
@@ -398,14 +352,14 @@ export function initSim({ viewer, getSite, setStatus }) {
     // what is sounding now, shown as well as heard
     const now = sound.state(t);
     $('pl-alarm').className = now ? 'on' : '';
-    $('pl-alarm').textContent = now === 'alarm' ? '🔔 Alarm ringing' : now === 'shaking' ? '〰 Shaking' : '';
+    $('pl-alarm').textContent = now === 'alarm' ? 'Alarm ringing' : now === 'shaking' ? 'Shaking' : '';
     sound.update(t, playing);
   }
   function play(on) {
     playing = on && !!layer.result;
     viewer.setDrillLighting(playing);
     sound.update(layer.t, playing);
-    $('pl-play').textContent = playing ? '❚❚' : '▶';
+    $('pl-play').textContent = playing ? 'Pause' : 'Play';
     $('pl-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
     if (playing) { if (layer.t >= layer.duration) seek(0); last = performance.now(); requestAnimationFrame(tick); }
   }
@@ -441,7 +395,7 @@ export function initSim({ viewer, getSite, setStatus }) {
   $('pl-sound').addEventListener('click', () => {
     const on = $('pl-sound').getAttribute('aria-pressed') !== 'true';
     $('pl-sound').setAttribute('aria-pressed', on);
-    $('pl-sound').textContent = on ? '🔊' : '🔇';
+    $('pl-sound').textContent = on ? 'Sound on' : 'Sound off';
     if (on) sound.unlock();
     sound.setEnabled(on);
   });

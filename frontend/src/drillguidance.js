@@ -35,7 +35,7 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
   let bindingGeneration = 0, generation = 0, controller = null, timer = null, spokenText = '', lastTime = 0;
   let referenceSite = null, referenceSnapshot = null, referencePromise = null, bindingMessage = 'Company guidance unavailable.';
   const cache = new Map();
-  enabled.checked = false;
+  enabled.checked = true;
   function cancelSpeech() { window.speechSynthesis?.cancel(); }
   function invalidate() {
     generation++;
@@ -56,9 +56,13 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
     const selected = validActions(actions) ? actions : validActions(local) ? local : [];
     action.textContent = selected.length ? `Drill action: ${selected[0].text}`
       : 'Follow official alarms, trained responders and your approved site procedures.';
-    $('rag-citations').textContent = selected.length
-      ? `Action sources: ${[...new Set(selected[0].citations.map((c) => c.id))].join(' · ')} — full sources in Drill subtitles`
-      : 'Company guidance unavailable · simulation facts only';
+    const citations=$('rag-citations');
+    citations.textContent=selected.length ? `${mode || 'Local source-backed guidance'} Sources: ` : 'Company guidance unavailable · simulation facts only';
+    if(selected.length)for(const c of selected[0].citations){
+      const link=document.createElement('a');link.textContent=c.id;link.title=`${c.title}, ${c.section}`;
+      try{const url=new URL(c.url,window.location.href);if(['https:','http:'].includes(url.protocol)){link.href=url.href;link.target='_blank';link.rel='noopener noreferrer';}}catch{}
+      citations.append(link,' ');
+    }
     status.textContent = selected.length ? `${mode || 'Fixed source-backed drill phrases — no model request.'} Sources support actions, not simulated facts.` : bindingMessage;
     output.replaceChildren();
     for (const item of selected) {
@@ -136,7 +140,7 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
       }
       if (token !== bindingGeneration) return;
       if (active) { render(); modelRequest(); }
-      else status.textContent = reference ? 'Source-backed subtitles ready. Start a fire drill; cloud is optional.' : bindingMessage;
+      else status.textContent = reference ? 'Source-backed subtitles ready. AI selection is enabled; fixed phrases remain available if offline.' : bindingMessage;
     })();
     return referencePromise;
   }
@@ -164,7 +168,7 @@ export function initDrillGuidance({ getSite, onHighlight = () => {} }) {
   $('rag-silence').addEventListener('click', cancelSpeech);
   return {
     siteChanged() {
-      stop(); enabled.checked = false; cache.clear(); bindingGeneration++;
+      stop(); enabled.checked = true; cache.clear(); bindingGeneration++;
       referenceSite = null; referencePromise = null; reference = null; fingerprint = null;
       void loadReference(getSite());
     },

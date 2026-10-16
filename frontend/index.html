@@ -137,7 +137,7 @@
     <p style="margin:6px 0 0;color:var(--muted)">Upload a DXF plan. Review inferred walls, doors, exits and rooms before using the 3D model.</p>
   </div>
   <div class="row">
-    <label class="btn primary">Open a plan (DXF)<input id="file" type="file" accept=".dxf" hidden></label>
+    <label class="btn primary">Open plan<input id="file" type="file" accept=".dxf" hidden></label>
     <select id="sample" aria-label="Load a sample" style="width:auto"><option value="dxf">Sample: DXF</option></select>
   </div>
   <div class="row">
@@ -162,8 +162,8 @@
   <section><div id="stats"></div></section>
   <section id="sim">
     <div class="pick-scenario" role="group" aria-label="What happens">
-      <button data-scenario="fire" aria-pressed="true"><span aria-hidden="true">🔥</span> Fire</button>
-      <button data-scenario="earthquake" aria-pressed="false"><span aria-hidden="true">🌍</span> Earthquake</button>
+      <button data-scenario="fire" aria-pressed="true">Fire</button>
+      <button data-scenario="earthquake" aria-pressed="false">Earthquake</button>
     </div>
     <select id="sim-scenario" hidden><option value="fire" selected>Fire</option><option value="earthquake">Earthquake</option></select>
     <label class="f fire-only">Where does it start?<select id="sim-fire"></select></label>
@@ -191,7 +191,7 @@
     <section id="drill-guidance" aria-labelledby="rag-title" style="margin-top:14px;border:1px solid var(--line);border-radius:8px;padding:10px">
       <h2 id="rag-title">Subtitles and voice</h2>
       <p style="font-size:12px;color:var(--muted)">A training tool, not real emergency advice. In a real emergency, follow the alarm, the emergency services and your site's procedures.</p>
-      <label><input id="rag-enable" type="checkbox"> Let AI choose the instructions (online)</label>
+      <label><input id="rag-enable" type="checkbox" checked> Let AI choose the instructions (online)</label>
       <p style="font-size:12px;color:var(--muted)">Only the room name and the event are sent, never the plan.</p>
       <div class="row" style="margin-top:8px">
 
@@ -256,13 +256,13 @@
     </div>
     <div id="pl-counts" class="view-only" aria-live="off"></div>
     <div id="player" class="view-only" hidden>
-      <button id="pl-play" aria-label="Play">▶</button>
+      <button id="pl-play" aria-label="Play">Play</button>
       <span class="clock" id="pl-clock">0:00</span>
       <input id="pl-time" type="range" min="0" max="100" step="0.1" value="0" aria-label="Time">
       <select id="pl-rate" aria-label="Playback speed" style="width:auto"><option value="1">1×</option><option value="5" selected>5×</option><option value="15">15×</option></select>
       <span id="pl-alarm" role="status"></span>
-      <button id="pl-sound" aria-pressed="true" aria-label="Sound" title="Sound on or off">🔊</button>
-      <button id="pl-close" aria-label="Close the fire drill">✕</button>
+      <button id="pl-sound" aria-pressed="true" aria-label="Sound" title="Sound on or off">Sound on</button>
+      <button id="pl-close" aria-label="Close drill">Close</button>
     </div>
     <div class="hint view-only" id="orbit-hint">Drag to rotate, right-drag to pan, scroll to zoom. Click a zone to select it.</div>
     <div class="hint view-only" id="walk-hint">Click the view to walk. WASD or arrows to move, Shift to run, Esc to release the mouse.</div>
