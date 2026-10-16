@@ -182,5 +182,5 @@ for (const p of plans) {
   fs.writeFileSync(path.join(out, `${p.name}.dxf`), p.dxf.toString());
   truth[p.name] = { objects: p.objects.map(([category, x, y]) => ({ category, at: [x, -y] })), stairs: p.stairs.map((s) => ({ treads: s.treads, at: [s.at[0], -s.at[1]] })) };
 }
-fs.writeFileSync(path.join(out, 'plans.json'), JSON.stringify(truth, null, 1));
+fs.writeFileSync(path.join(out, 'plans.json'), `${JSON.stringify(truth, null, 1)}\n`);
 console.log(`wrote ${plans.length} plans to ${out}`);
