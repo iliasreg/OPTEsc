@@ -499,6 +499,8 @@ export function renderDxf(text, { wallLayers = null, wallStrokeM = 0.12, maxPx =
   const objects = extractObjects(flat, unitM).map((o) => ({ ...o, polygon: o.polygon.map(toPxM) }));
   return {
     canvas: cv, pxPerM, texts, objects,
+    // canvas pixel -> drawing units: x = minX + (px - pad) / (unitM * pxPerM), y = maxY - (py - pad) / (unitM * pxPerM)
+    frame: { minX, maxY, unitM, pad, units: dxf.units ?? null },
     layers: layerNames.map((name) => ({ name, wall: walls.has(name) })),
     unitsGuessed: guessed ? (unitM === 0.001 ? 'millimetres' : unitM === 0.01 ? 'centimetres' : 'metres') : null,
   };

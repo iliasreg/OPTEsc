@@ -7,7 +7,8 @@ import * as THREE from '../frontend/vendor/three.module.js';
 const source = fs.readFileSync(new URL('../frontend/src/simview.js', import.meta.url),'utf8')
   .replace("'three'", JSON.stringify(new URL('../frontend/vendor/three.module.js',import.meta.url).href))
   .replace("'./sim.js'", JSON.stringify(new URL('../frontend/src/sim.js',import.meta.url).href))
-  .replace("'./drillevents.js'", JSON.stringify(new URL('../frontend/src/drillevents.js',import.meta.url).href));
+  .replace("'./drillevents.js'", JSON.stringify(new URL('../frontend/src/drillevents.js',import.meta.url).href))
+  .replace("'./equipment.js'", JSON.stringify(new URL('../frontend/src/equipment.js',import.meta.url).href));
 const { SimLayer } = await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 
 test('highlight overlay targets room floor or door and clears without changing the site', () => {

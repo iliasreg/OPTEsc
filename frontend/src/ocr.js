@@ -74,7 +74,9 @@ async function reReadSizes(w, canvas, labels, lines) {
       const size = parseSize(data.text.trim(), { minArea: minAreaFor(l.type) });
       if (!size || size.area <= 0.5 || size.area >= 5000) continue;
       // trust the second reading when it is a clean size, or when the first found none
-      if (!l.printedArea || !/partly/.test(size.from)) Object.assign(l, { printedArea: Math.round(size.area * 100) / 100, printedFrom: size.from });
+      // a second reading far from the first has usually lost a digit ("50.7" read as "7"): keep the first
+      const far = l.printedArea && (size.area > 2 * l.printedArea || size.area < l.printedArea / 2);
+      if ((!l.printedArea || !/partly/.test(size.from)) && !far) Object.assign(l, { printedArea: Math.round(size.area * 100) / 100, printedFrom: size.from });
     }
   } finally {
     await w.setParameters({ tessedit_pageseg_mode: '11', tessedit_char_whitelist: '' });

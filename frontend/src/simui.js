@@ -7,6 +7,9 @@ import { BUILDINGS } from './quake.js';
 import { initExtinguisherTraining } from './extinguishertraining.js';
 import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
 import { DrillSound } from './drillsound.js';
+import { equipmentPlan, cameraView } from './equipment.js';
+import { EquipmentView } from './equipmentview.js';
+import { planPdf, planDxf } from './planexport.js';
 
 const $ = (id) => document.getElementById(id);
 // Bump when the simulation changes: the worker and the simulation it loads are fetched afresh.
@@ -19,6 +22,23 @@ export function initSim({ viewer, getSite, setStatus }) {
   const equipment = initExtinguisherTraining({viewer,getSite});
   initProjectionEffects(viewer,layer,equipment);
   const sound = new DrillSound();
+  // projectors and cameras: placed for the plan, drawn in 3D, exported as a drawing
+  const kitView = new EquipmentView(viewer);
+  let kit = null, kitKey = '';
+  function ensureKit() {
+    const s = getSite();
+    if (!s) { kit = null; kitView.setPlan(null); return null; }
+    const st = equipment.station, key = `${s.grid.w}x${s.grid.h}:${s.doors.length}:${viewer.wallHeight}:${st ? st.x : ''}`;
+    if (kit && kit.site === s && kitKey === key) return kit;
+    kit = { site: s, plan: equipmentPlan(s, { wallHeight: viewer.wallHeight, station: st }) };
+    kit.seen = cameraView(s, kit.plan.cameras);
+    kitKey = key;
+    kitView.setPlan(kit.plan);
+    const c = kit.plan.coverage;
+    kit.summary = `${kit.plan.projectors.length} projectors and ${kit.plan.cameras.length} cameras placed: ${Math.round(c.targets * 100)}% of sign spots lit, ${Math.round(c.floor * 100)}% of the floor watched.`;
+    return kit;
+  }
+  layer.onProjections = (meshes) => kitView.showBeams(meshes);
   const guidance = initDrillGuidance({ getSite, onHighlight: (event, site) => layer.highlight(event, site) });
   let revision = 0;
   let fireAt = null; // [x, y] when a spot was picked
@@ -97,7 +117,8 @@ export function initSim({ viewer, getSite, setStatus }) {
   function siteChanged() {
     stop();
     guidance.siteChanged();
-    void equipment.siteChanged();
+    void equipment.siteChanged().then(() => { kit = null; ensureKit(); });
+    kit = null;
     layer.clear();
     $('player').hidden = true;
     $('sim-out').innerHTML = '';
@@ -134,6 +155,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       let r;
       try { r = await call('run', { ...simSite(s), evacuationExitIds }, opts()); } finally { viewer.renderer.setAnimationLoop(() => viewer._tick()); }
       if (token !== revision || s !== getSite()) return;
+      { const k = ensureKit(); layer.setKit(k?.plan || null, k?.seen || null); }
       layer.show(r, s);
       sound.load(r);
       guidance.start(r, s);
@@ -374,6 +396,29 @@ export function initSim({ viewer, getSite, setStatus }) {
     else requestAnimationFrame(tick);
   }
 
+  $('t-equipment').addEventListener('change', (e) => { if (e.target.checked) ensureKit(); kitView.setVisible(e.target.checked); });
+  // the walls (ceiling) change height: the devices move with them
+  $('p-height')?.addEventListener('change', () => { if (kit) ensureKit(); });
+  const save = (data, name, type) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  const slug = () => (getSite()?.name || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  // View → Export (the buttons are made by workspace.js, after this runs)
+  document.addEventListener('click', (e) => {
+    const id = e.target?.id;
+    if (id !== 'export-pdf' && id !== 'export-dxf') return;
+    const k = ensureKit();
+    if (!k) { setStatus('Open a plan first.', true); return; }
+    try {
+      if (id === 'export-pdf') save(planPdf(getSite(), k.plan), `${slug()}_projectors_cameras.pdf`, 'application/pdf');
+      else save(planDxf(getSite(), k.plan), `${slug()}_projectors_cameras.dxf`, 'application/dxf');
+      setStatus(`${id === 'export-pdf' ? 'PDF' : 'DXF'} exported. ${k.summary}`);
+    } catch (err) { setStatus(`Export failed: ${err.message}`, true); console.error(err); }
+  });
   $('t-projections').addEventListener('change', e => { layer.setProjections(e.target.checked); equipment.setProjectionEnabled(e.target.checked); });
   $('sim-run').addEventListener('click', () => run());
   $('sim-check').addEventListener('click', check);
@@ -405,7 +450,7 @@ export function initSim({ viewer, getSite, setStatus }) {
     $('sim-scenario').dispatchEvent(new Event('change'));
   });
   $('pl-time').addEventListener('input', (e) => { play(false); guidance.invalidate(); seek(parseFloat(e.target.value)); });
-  $('pl-close').addEventListener('click', () => { stop(); sound.silence(); $('pl-alarm').className = ''; layer.clear(); equipment.setDrillActive(false); $('player').hidden = true; });
+  $('pl-close').addEventListener('click', () => { stop(); sound.silence(); $('pl-alarm').className = ''; kitView.clearBeams(); layer.clear(); equipment.setDrillActive(false); $('player').hidden = true; });
 
   return {
     siteChanged,

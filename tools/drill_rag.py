@@ -426,6 +426,14 @@ class Service:
 
 def make_handler(service, frontend=ROOT / "frontend"):
     class Handler(SimpleHTTPRequestHandler):
+        # Windows' registry does not know these: browsers refuse a module or wasm sent as text.
+        extensions_map = {
+            **SimpleHTTPRequestHandler.extensions_map,
+            ".mjs": "text/javascript",
+            ".js": "text/javascript",
+            ".wasm": "application/wasm",
+        }
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(frontend), **kwargs)
 

@@ -45,7 +45,7 @@
   #zones .sw { width: 12px; height: 12px; border-radius: 3px; grid-row: span 2; }
   #zones small { color: var(--muted); grid-column: 2 / span 2; }
   #main { position: relative; min-width: 0; display: flex; flex-direction: column; }
-  #main.drag::after { content: 'Drop a DXF floor plan'; position: absolute; inset: 12px; border: 3px dashed var(--accent); border-radius: 16px; display: grid; place-items: center; font-size: 20px; background: color-mix(in srgb, var(--bg) 80%, transparent); z-index: 5; }
+  #main.drag::after { content: 'Drop a floor plan (DXF, PDF or image)'; position: absolute; inset: 12px; border: 3px dashed var(--accent); border-radius: 16px; display: grid; place-items: center; font-size: 20px; background: color-mix(in srgb, var(--bg) 80%, transparent); z-index: 5; }
   .bar { display: flex; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; align-items: center; }
   .bar .sep { flex: 1; }
   .bar label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
@@ -94,6 +94,8 @@
   .verdict b { font-size: 16px; } .verdict.ok { background: color-mix(in srgb, #2f9e5b 14%, var(--panel)); } .verdict.ok b { color: #2f9e5b; }
   .verdict.bad { background: color-mix(in srgb, var(--crit) 14%, var(--panel)); } .verdict.bad b { color: var(--crit); }
   .simnote { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+  body:not([data-plan-scale="unknown"]) #scale-row { display: none; }
+  #scale-row { margin-top: 10px; } #scale-row #scale-note { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
   .pick-scenario { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
   .pick-scenario button { padding: 12px 8px; font-size: 15px; font-weight: 600; }
   .linkish { background: none; border: 0; padding: 0 0 8px; color: var(--accent); font-size: 12px; text-decoration: underline; justify-self: start; }
@@ -137,8 +139,8 @@
     <p style="margin:6px 0 0;color:var(--muted)">Upload a DXF plan. Review inferred walls, doors, exits and rooms before using the 3D model.</p>
   </div>
   <div class="row">
-    <label class="btn primary">Open plan<input id="file" type="file" accept=".dxf" hidden></label>
-    <select id="sample" aria-label="Load a sample" style="width:auto"><option value="dxf">Sample: DXF</option></select>
+    <label class="btn primary">Open plan<input id="file" type="file" accept=".dxf,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.gif" hidden></label>
+    <select id="sample" aria-label="Load a sample" style="width:auto"><option value="dxf">Sample: DXF</option><option value="pdf">Sample: PDF</option><option value="png">Sample: image</option></select>
   </div>
   <div class="row">
     <button id="export">Site JSON</button>
@@ -234,6 +236,7 @@
       <select id="color-mode" aria-label="Floor colour" style="width:auto"><option value="zones">Colour: rooms</option><option value="distance">Colour: distance to exit</option></select>
       <label><input id="t-overlay" type="checkbox">Plan on floor</label>
       <label><input id="t-projections" type="checkbox" checked>Projected drill signs</label>
+      <label><input id="t-equipment" type="checkbox" checked>Projectors &amp; cameras</label>
       <small style="color:var(--muted)">Projection concept · simulated signals, not installed equipment.</small>
       <label>Walls <input id="p-height" type="range" min="0.5" max="6" step="0.1" value="2.6" style="width:80px"></label>
     </span>

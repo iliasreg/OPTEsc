@@ -108,7 +108,34 @@ The building damage state comes from the HAZUS Earthquake Model Technical Manual
 - **Behaviour:** 65% take cover until the shaking stops, the rest leave at once (assumption).
   Wheelchair users stay put.
 
-## 6. Verification and validation (`tests/`)
+## 6. Projectors and cameras (`frontend/src/equipment.js`, `frontend/src/planexport.js`)
+
+Where to put the projectors that show the drill signs, and the cameras that tell them what is
+happening. View → Export gives a one-page PDF (A3) with the plan, every device and the reason for
+it, and a DXF with each kind of device on its own layer, in the original drawing's coordinates.
+
+- **Sign spots:** at every door people walk through to get out, normally or when one exit is
+  blocked (the usual design check): a sign on the floor in front of the door, an EXIT sign above
+  each exit and an arrow 3 m before the door. Large rooms also get arrows about every 8 m.
+- **Projectors (assumed: ceiling-mounted, steerable, up to 6 images, legible up to 9 m and at
+  least 25° above the horizontal):** one on the ceiling 2.2 m inside the room from each of those
+  doors, lighting that door's signs; doors close together share one; then one over each pair of
+  room arrows. A projector only lights its own room.
+- **Cameras (assumed: 90° wide, 15 m deep):** in a corner of each room, looking diagonally
+  across it; another (corner, wall, or angled along a corridor) only where one cannot see 97% of
+  the room; hung from the ceiling only in open areas over 6 m from any wall. Every door is
+  watched from at least one side; no two cameras face each other; each watches its own room.
+  Any camera the others make redundant is dropped.
+- **What the projections show:** they switch on with the alarm (or when a camera sees the fire).
+  Arrows point to the nearest exit still open; door signs say EXIT, BLOCKED or SMOKE, or point
+  through the door when the way out goes through it; a spot in smoke or cut off says so. In an
+  earthquake every floor spot says TAKE COVER until the shaking stops. Fire, fallen walls and
+  jammed doors are only known once a camera sees them, 15 s later (video detection; assumption).
+
+Positions are a starting point for a site survey, not an installation design: furniture does not
+hide the floor from cameras here, and real products differ in range and image count.
+
+## 7. Verification and validation (`tests/`)
 
 | Check | Result |
 |---|---|
@@ -131,7 +158,7 @@ The building damage state comes from the HAZUS Earthquake Model Technical Manual
 These checks cover the code's behaviour against references and simple cases. They are not a
 validation against full-scale fire tests or recorded evacuations of a specific building.
 
-## 7. Limits to keep in mind
+## 8. Limits to keep in mind
 
 - **One floor at a time.** Stairs are either an exit (an upper floor) or an obstacle. Stair descent
   and floor-to-floor smoke spread are not modelled.

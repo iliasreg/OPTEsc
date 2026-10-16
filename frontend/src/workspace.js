@@ -20,12 +20,18 @@ themeButton.addEventListener('click',()=>setTheme(document.documentElement.datas
 const setup=document.createElement('section');setup.id='simple-sim';
 setup.append($('.pick-scenario'),$('#sim-fire').closest('label'));
 sections.setup.append(setup,$('#file').closest('label'));
+// A plan with no scale of its own (an image, a PDF without "1:100"): its width can be typed.
+const scaleRow=document.createElement('div');scaleRow.id='scale-row';
+scaleRow.append($('#p-width').closest('label'),$('#scale-note'));
+sections.setup.append(scaleRow);
 sections.details.append(group('Drill results',[$('#sim-out')]));
 const views=document.createElement('div');views.className='workspace-views';
 views.append(...document.querySelectorAll('[data-tabbtn]'));
 sections.view.append(views,$('#main > .bar .edit-only'));
-const exportButton=document.createElement('button');exportButton.id='final-export';exportButton.textContent='Export';exportButton.disabled=true;exportButton.title='Final export is not implemented yet.';
-sections.view.append(group('Export',[exportButton]));
+// The projector and camera plan: a one-page PDF to read, a DXF for CAD.
+const exportButton=(id,text,title)=>{const b=document.createElement('button');b.id=id;b.textContent=text;b.title=title;return b;};
+const exportNote=document.createElement('p');exportNote.className='workspace-source-note';exportNote.textContent='Where to put the projectors and cameras, and why.';
+sections.view.append(group('Export',[exportNote,exportButton('export-pdf','Export PDF','One page: the plan, every projector and camera, and why each is there'),exportButton('export-dxf','Export DXF','Projectors, cameras and signs on their own layers, in the same coordinates as the drawing')]));
 // Retain internal defaults and DOM hooks while removing advanced controls from the interface.
 legacy.id='workspace-internal';legacy.hidden=true;legacy.setAttribute('aria-hidden','true');
 legacy.append($('#main > .bar'));
