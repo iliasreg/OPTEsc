@@ -20,11 +20,21 @@ Use `./run.sh 9000` for another port. Stop the server with `Ctrl+C`.
 
 ## Use
 
-- **Setup** — choose the fire location and occupant count, import a plan, or enable optional audio and cloud guidance.
+- **Setup** — choose a fire or an earthquake, who is inside (staff, public, care home) and how many, import a plan, or enable optional audio and cloud guidance.
 - **Details** — inspect building checks, drill results and room measurements; export Site JSON or IFC.
 - **View** — orbit, walk through the building or edit the plan.
 
 Subtitles identify simulated fire, smoke and blocked doors during playback and highlight the named room or door. Instructions include source references and update when you rewind.
+
+Furniture, machines and stairs are read from the DXF by layer or block name (AIA, French, German and other conventions) and stairs also by their evenly spaced treads. People walk round furniture. Stairs block the floor unless **Stairs lead down to the exit** is ticked (an upper floor); wheelchair users then wait for help at the landing.
+
+**Fire** uses a two-zone smoke model with the NZ Verification Method C/VM2 design fire, detectors and sprinklers, and checks each room against the C/VM2 tenability limits at 2 m (visibility, ISO 13571 doses). Occupants react after the C/VM2 pre-travel time for the building use, faster with a voice alarm, and move at SFPE speeds through doors of limited capacity. Older people and people with a walking aid or a wheelchair are slower (Boyce et al. 1999); wheelchairs cannot pass doors under 0.75 m.
+
+**Earthquake** damage follows HAZUS (FEMA) for the chosen structure and seismic design: the building's damage state, collapse and casualties come from its fragility curves and casualty rates; falling walls, rubble and jammed doors illustrate that state on the plan.
+
+**Safety check** runs the emergency 20 times with different people and reports, for each room, how long it stays tenable against how long the last person needs to leave through it (95% of runs), and who did not get out and why.
+
+Method, sources, verification and limits: [docs/simulation-method.md](docs/simulation-method.md). Earthquake and fire subtitles state simulation facts; no cited earthquake actions are bundled yet.
 
 Plan import is **DXF-only** (`.dxf`, case-insensitive), through both the file picker and drag-and-drop. PDF, images, IFC and saved Site JSON are rejected before reading. Site JSON and IFC exports remain available, including the IFC export preview. Plan reading and simulation run locally in the browser; raster OCR and AI wall detection are not used. Imported geometry, scale and inferred exits still require review before running a drill.
 
@@ -58,6 +68,8 @@ Requires Node.js 20+ for the JavaScript tests.
 python3 -m unittest discover -s tests -p 'test_drill_rag.py'
 node --test tests/*.test.mjs
 ```
+
+`node tools/make_test_plans.mjs tests/fixtures` regenerates the five test plans (different layer conventions) used to check that objects and stairs are found on any drawing.
 
 ## License
 

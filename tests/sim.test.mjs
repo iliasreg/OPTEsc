@@ -39,20 +39,20 @@ test('Weidmann speed drops with crowding', () => {
   assert.equal(weidmann(10), 0.1);
 });
 
-test('one 1 m exit lets out about 1.3 people per second', () => {
+test('one 1 m exit lets out 0.92 people per second (C/VM2 eq. 3.4, effective width 0.7 m)', () => {
   const site = room(12, 12, [['S', 5.5, 6.5]]);
-  const r = simulate(site, { fire: [1, 1], fireSpeed: 1e-4, smokeSpeed: 1e-4, people: { Z1: 100 }, preMove: [0, 0] });
+  const r = simulate(site, { scenario: 'none', people: { Z1: 100 }, preMove: [0, 0] });
   const m = r.metrics;
   assert.equal(m.out, 100);
   const outs = r.people.map((p) => p.out_s).sort((a, b) => a - b);
   const flow = 80 / (outs[89] - outs[9]); // middle 80 people, once the queue has formed
-  assert.ok(flow > 1.1 && flow < 1.45, `flow ${flow.toFixed(2)} p/s`);
+  assert.ok(flow > 0.92 * 0.9 && flow < 0.92 * 1.1, `flow ${flow.toFixed(2)} p/s`);
   assert.ok(m.doors[0].max_queue > 5, 'a queue forms at the door');
 });
 
-test('a fire at one exit sends everyone to the other', () => {
+test('legacy grid model: a fire at one exit sends everyone to the other', () => {
   const site = room(20, 8, [['W', 3, 5], ['E', 3, 5]]);
-  const r = simulate(site, { fire: [1.2, 5], fireSpeed: 0.5, fireDoorDelay: 0, people: { Z1: 30 }, preMove: [5, 5] });
+  const r = simulate(site, { fireModel: 'grid', fire: [1.2, 5], fireSpeed: 0.5, fireDoorDelay: 0, people: { Z1: 30 }, preMove: [5, 5] });
   assert.equal(r.metrics.out + r.metrics.overcome, 30);
   const west = r.metrics.exits.find((e) => e.id === 'D1');
   assert.ok(west.people <= 2, `${west.people} people used the exit on fire`);

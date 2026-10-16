@@ -4,6 +4,7 @@ import { Editor } from './editor2d.js';
 import { renderDxf, textHints } from './vector.js';
 import { siteToIfc } from './ifc.js';
 import { initSim } from './simui.js';
+import { placeObjects } from './objects.js';
 
 const $ = (id) => document.getElementById(id);
 const ZONE_TYPES = Object.keys(TYPE_COLORS);
@@ -19,8 +20,9 @@ const editor = new Editor($('edit-canvas'), { onChange: () => resegment() });
 // ---------- loading ----------
 
 // Render the DXF to a canvas with its scale and text.
-function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], unitsGuessed = null, note = '' }) {
+function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], unitsGuessed = null, note = '', objects = [] }) {
   state.source = cv;
+  state.objectsPx = objects;
   state.name = name;
   state.image = name;
   state.kind = kind;
@@ -53,7 +55,7 @@ async function loadDxf(text, name) {
   const r = renderDxf(text);
   const walls = r.layers.filter((l) => l.wall).map((l) => l.name);
   loadCanvas(r.canvas, {
-    name, kind: 'dxf', pxPerM: r.pxPerM, hints: textHints(r.texts, r.pxPerM), unitsGuessed: r.unitsGuessed,
+    name, kind: 'dxf', pxPerM: r.pxPerM, hints: textHints(r.texts, r.pxPerM), unitsGuessed: r.unitsGuessed, objects: r.objects,
     note: `Exact scale from the DXF${r.unitsGuessed ? ` (units guessed: ${r.unitsGuessed})` : ''}. Wall layers: ${walls.join(', ') || 'none found'}.`,
   });
 }
@@ -93,6 +95,7 @@ function resegment(reframe = false) {
   const zones = inheritZones(prev, state.site, state.seg);
   state.site = toSite(state.base, state.seg, { name: state.name, image: state.image, kind: state.kind, zones });
   applyHints();
+  state.site.objects = placeObjects(state.site, state.base.source, state.objectsPx);
   state.dist = analyzeSite(state.site, state.base, state.seg, { maxTravelM: params().maxTravelM, scaleFrom: state.scaleFrom, scaleCount: state.scaleCount });
   editor.set(state.base, state.edits, state.seg, state.plan);
   if (reframe) viewer.setSite(state.site, state.plan, state.dist);
@@ -266,6 +269,8 @@ function renderInfo() {
     <div><b>${s.doors.length - exits}</b><span>doors</span></div>
     <div><b>${exits}</b><span>exits</span></div>
     <div><b>${s.egress.max_travel_m}</b><span>m to exit, max</span></div>`;
+  const objs = s.objects || [], stairs = objs.filter((o) => o.kind === 'stair').length, furn = objs.filter((o) => o.kind === 'object').length;
+  if (furn || stairs) $('stats').insertAdjacentHTML('beforeend', `<p class="objects-note">Also read from the drawing: ${furn} piece${furn === 1 ? '' : 's'} of furniture or machinery, ${stairs} stair flight${stairs === 1 ? '' : 's'}.</p>`);
 
   const counts = { critical: 0, warning: 0, info: 0 };
   for (const i of s.issues) counts[i.severity]++;
@@ -420,6 +425,7 @@ $('p-travel').addEventListener('change', () => resegment());
 $('p-height').addEventListener('input', (e) => { viewer.setWallHeight(parseFloat(e.target.value)); sim.equipment.refresh(); });
 $('t-overlay').addEventListener('change', (e) => viewer.setOverlay(e.target.checked));
 $('t-labels').addEventListener('change', (e) => viewer.setLabels(e.target.checked));
+$('t-objects').addEventListener('change', (e) => viewer.setObjects(e.target.checked));
 $('color-mode').addEventListener('change', (e) => {
   viewer.setColorMode(e.target.value);
   $('dist-legend').hidden = e.target.value !== 'distance';

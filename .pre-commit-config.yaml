@@ -1,6 +1,6 @@
 minimum_pre_commit_version: '4.7.0'
 default_stages: [pre-commit]
-exclude: '^(vendor/|third_party/)'
+exclude: '(^|/)(vendor|third_party)/'
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

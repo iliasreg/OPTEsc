@@ -34,5 +34,5 @@ $('#workspace-close').addEventListener('click',()=>showPanel(null));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&currentPanel)showPanel(null)});
 // Keep mandatory warnings available; only their location changes.
 $('#sim-worst').closest('.row').classList.add('workspace-extra-run');
-const advanced=group('Advanced drill controls',[$('#sim-pick'),$('#sim-worst')],false);simulation.insertBefore(advanced,simulation.firstElementChild.nextSibling);
+const advanced=group('Advanced drill controls',[$('#sim-pick'),$('#sim-worst')],false);advanced.classList.add('fire-only');simulation.insertBefore(advanced,simulation.firstElementChild.nextSibling);
 showPanel('setup');

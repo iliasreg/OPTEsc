@@ -1,0 +1,351 @@
+{
+ "office_fr": {
+  "objects": [
+   {
+    "category": "table",
+    "at": [
+     11,
+     -2
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     11,
+     -2.9
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     11,
+     -5
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     11,
+     -5.9
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     14,
+     -2
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     14,
+     -2.9
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     14,
+     -5
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     14,
+     -5.9
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     19,
+     -2
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     19,
+     -2.9
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     19,
+     -5
+    ]
+   },
+   {
+    "category": "seat",
+    "at": [
+     19,
+     -5.9
+    ]
+   },
+   {
+    "category": "sanitary",
+    "at": [
+     2,
+     -1
+    ]
+   },
+   {
+    "category": "sanitary",
+    "at": [
+     3,
+     -1
+    ]
+   }
+  ],
+  "stairs": [
+   {
+    "treads": 14,
+    "at": [
+     18.96,
+     -10.6
+    ]
+   }
+  ]
+ },
+ "school_de": {
+  "objects": [
+   {
+    "category": "table",
+    "at": [
+     2.2,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     4.8,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     7.4,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     2.2,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     4.8,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     7.4,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     2.2,
+     -6.25
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     4.8,
+     -6.25
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     7.4,
+     -6.25
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     12.2,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     14.799999999999999,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     17.4,
+     -1.85
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     12.2,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     14.799999999999999,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     17.4,
+     -4.05
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     12.2,
+     -6.25
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     14.799999999999999,
+     -6.25
+    ]
+   },
+   {
+    "category": "table",
+    "at": [
+     17.4,
+     -6.25
+    ]
+   },
+   {
+    "category": "storage",
+    "at": [
+     5,
+     -8.4
+    ]
+   },
+   {
+    "category": "storage",
+    "at": [
+     15,
+     -8.4
+    ]
+   }
+  ],
+  "stairs": [
+   {
+    "treads": 9,
+    "at": [
+     22.65,
+     -2.3
+    ]
+   },
+   {
+    "treads": 9,
+    "at": [
+     24.15,
+     -2.3
+    ]
+   }
+  ]
+ },
+ "hotel_aia": {
+  "objects": [
+   {
+    "category": "bed",
+    "at": [
+     3.5,
+     -2.2
+    ]
+   },
+   {
+    "category": "storage",
+    "at": [
+     5.7,
+     -4.3
+    ]
+   },
+   {
+    "category": "bed",
+    "at": [
+     10.5,
+     -2.2
+    ]
+   },
+   {
+    "category": "storage",
+    "at": [
+     12.7,
+     -4.3
+    ]
+   },
+   {
+    "category": "bed",
+    "at": [
+     17.5,
+     -2.2
+    ]
+   },
+   {
+    "category": "storage",
+    "at": [
+     19.7,
+     -4.3
+    ]
+   }
+  ],
+  "stairs": [
+   {
+    "treads": 7,
+    "at": [
+     22.45,
+     -6.55
+    ]
+   },
+   {
+    "treads": 6,
+    "at": [
+     23.94,
+     -7.9
+    ]
+   }
+  ]
+ },
+ "workshop_layer0": {
+  "objects": [],
+  "stairs": [
+   {
+    "treads": 12,
+    "at": [
+     21.5,
+     -2.5
+    ]
+   }
+  ]
+ },
+ "walls_only": {
+  "objects": [],
+  "stairs": []
+ }
+}

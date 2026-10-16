@@ -4,17 +4,50 @@ import * as THREE from 'three';
 import { smokeAt, STATE } from './sim.js';
 import { projectionPlan, projectionDoorKind } from './drillevents.js';
 
-export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a' };
+export const PEOPLE_COLORS = { waiting: '#8a94a0', moving: '#2f6fe0', overcome: '#d64545', trapped: '#c98a1a', assist: '#8a5cd6', injured: '#e0457b' };
 const STATE_COLOR = {
   [STATE.WAITING]: new THREE.Color(PEOPLE_COLORS.waiting),
   [STATE.MOVING]: new THREE.Color(PEOPLE_COLORS.moving),
   [STATE.OVERCOME]: new THREE.Color(PEOPLE_COLORS.overcome),
   [STATE.TRAPPED]: new THREE.Color(PEOPLE_COLORS.trapped),
+  [STATE.ASSIST]: new THREE.Color(PEOPLE_COLORS.assist),
+  [STATE.INJURED]: new THREE.Color(PEOPLE_COLORS.injured),
+};
+
+// One figure per profile, feet at the origin, facing +x.
+const part = (geo, x, y, z, rz = 0) => { if (rz) geo.rotateZ(rz); geo.translate(x, y, z); return geo; };
+export const FIGURES = {
+  adult: () => mergeGeometries(
+    part(new THREE.CylinderGeometry(0.2, 0.22, 1.35, 10), 0, 0.675, 0),
+    part(new THREE.SphereGeometry(0.14, 10, 8), 0, 1.55, 0)),
+  // a little shorter, head forward
+  older: () => mergeGeometries(
+    part(new THREE.CylinderGeometry(0.19, 0.22, 1.25, 10), 0, 0.625, 0),
+    part(new THREE.SphereGeometry(0.135, 10, 8), 0.07, 1.42, 0)),
+  // with a walking stick held out in front
+  aid: () => mergeGeometries(
+    part(new THREE.CylinderGeometry(0.2, 0.22, 1.3, 10), 0, 0.65, 0),
+    part(new THREE.SphereGeometry(0.14, 10, 8), 0, 1.5, 0),
+    part(new THREE.CylinderGeometry(0.025, 0.025, 0.95, 6), 0.3, 0.47, 0.18, -0.2)),
+  // seated, on a chair with two big wheels
+  wheelchair: () => {
+    const wheel = (z) => { const g = new THREE.CylinderGeometry(0.3, 0.3, 0.05, 16); g.rotateX(Math.PI / 2); return part(g, -0.05, 0.3, z); };
+    return mergeGeometries(
+      part(new THREE.BoxGeometry(0.5, 0.08, 0.46), 0, 0.5, 0),
+      part(new THREE.BoxGeometry(0.06, 0.5, 0.46), -0.24, 0.78, 0),
+      wheel(0.27), wheel(-0.27),
+      part(new THREE.CylinderGeometry(0.17, 0.19, 0.6, 10), -0.05, 0.85, 0),
+      part(new THREE.SphereGeometry(0.13, 10, 8), -0.03, 1.27, 0),
+      part(new THREE.BoxGeometry(0.42, 0.14, 0.36), 0.2, 0.6, 0),
+      part(new THREE.BoxGeometry(0.12, 0.42, 0.3), 0.38, 0.3, 0));
+  },
 };
 
 export class SimLayer {
-  constructor(viewer) {
+  // QuakeView (quakeview.js) draws earthquake damage; passed in so this module stays light
+  constructor(viewer, { QuakeView = null } = {}) {
     this.viewer = viewer;
+    this.QuakeView = QuakeView;
     this.group = new THREE.Group();
     viewer.scene.add(this.group);
     this.result = null;
@@ -59,6 +92,8 @@ export class SimLayer {
 
   clear() {
     this.highlight(null, null);
+    this.quakeView?.dispose();
+    this.quakeView = null;
     this.projections.clear();
     this.projectionGeometry?.dispose(); this.projectionGeometry = null;
     for (const material of this.projectionMaterials.values()) { material.map.dispose(); material.dispose(); }
@@ -79,17 +114,20 @@ export class SimLayer {
     this.c = c; this.w = w; this.h = h;
     const N = result.people.length;
 
-    // people: a body and a head, coloured by what they are doing
-    const body = new THREE.CylinderGeometry(0.2, 0.22, 1.35, 10);
-    body.translate(0, 0.675, 0);
-    const head = new THREE.SphereGeometry(0.14, 10, 8);
-    head.translate(0, 1.55, 0);
-    const geo = mergeGeometries(body, head);
-    this.people = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.6 }), Math.max(1, N));
-    this.people.count = N;
-    this.people.castShadow = true;
-    this.people.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, N) * 3), 3);
-    this.group.add(this.people);
+    // people: one figure per profile (a stick, a wheelchair...), coloured by what they are doing
+    this.figures = {};
+    this.slot = new Int32Array(N);
+    this.heading = new Float32Array(N);
+    const byProfile = {};
+    result.people.forEach((p, k) => { const pr = FIGURES[p.profile] ? p.profile : 'adult'; (byProfile[pr] ??= []).push(k); });
+    for (const [pr, list] of Object.entries(byProfile)) {
+      const mesh = new THREE.InstancedMesh(FIGURES[pr](), new THREE.MeshStandardMaterial({ roughness: 0.6 }), list.length);
+      mesh.castShadow = true;
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(list.length * 3), 3);
+      list.forEach((k, s) => { this.slot[k] = s; });
+      this.figures[pr] = { mesh, list };
+      this.group.add(mesh);
+    }
 
     // fire and smoke on blocks of about half a metre (coarser for big sites)
     const bs = Math.max(1, Math.round(Math.max(0.5, Math.sqrt((w * h * c * c) / 20000)) / c));
@@ -122,6 +160,8 @@ export class SimLayer {
     this.smoke.renderOrder = 2;
     this.group.add(this.flames, this.smoke);
 
+    if (result.quake && this.QuakeView) this.quakeView = new this.QuakeView(this.viewer, this.group, result, site);
+    if (!result.fire) { this.light = null; this.setTime(0); return; }
     // fire start marker
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.75, 32), new THREE.MeshBasicMaterial({ color: '#d64545', side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2;
@@ -148,31 +188,46 @@ export class SimLayer {
     const b = Math.min(times.length - 1, a + 1);
     const f = b > a ? Math.min(1, Math.max(0, (t - times[a]) / (times[b] - times[a]))) : 0;
     const m = new THREE.Matrix4();
-    const N = r.people.length;
     const P = pos[a], Q = pos[b], S = state[a];
-    for (let k = 0; k < N; k++) {
-      const st = S[k];
-      const x = P[2 * k] + (Q[2 * k] - P[2 * k]) * f, y = P[2 * k + 1] + (Q[2 * k + 1] - P[2 * k + 1]) * f;
-      if (st === STATE.OUT) m.makeScale(0, 0, 0);
-      else if (st === STATE.OVERCOME) m.makeRotationZ(Math.PI / 2).setPosition(x - 0.7, 0.2, y);
-      else m.makeTranslation(x, 0, y);
-      this.people.setMatrixAt(k, m);
-      this.people.setColorAt(k, STATE_COLOR[st] || STATE_COLOR[STATE.MOVING]);
+    const turn = new THREE.Matrix4();
+    for (const { mesh, list } of Object.values(this.figures)) {
+      for (const k of list) {
+        const st = S[k];
+        const dx = Q[2 * k] - P[2 * k], dy = Q[2 * k + 1] - P[2 * k + 1];
+        const x = P[2 * k] + dx * f, y = P[2 * k + 1] + dy * f;
+        // face the way they walk (figures are built facing +x)
+        if (dx * dx + dy * dy > 1e-4) this.heading[k] = Math.atan2(-dy, dx);
+        if (st === STATE.OUT) m.makeScale(0, 0, 0);
+        else if (st === STATE.OVERCOME || st === STATE.INJURED) m.makeRotationY(this.heading[k]).multiply(turn.makeRotationZ(Math.PI / 2)).setPosition(x, 0.2, y);
+        else m.makeRotationY(this.heading[k]).setPosition(x, 0, y);
+        mesh.setMatrixAt(this.slot[k], m);
+        mesh.setColorAt(this.slot[k], STATE_COLOR[st] || STATE_COLOR[STATE.MOVING]);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.instanceColor.needsUpdate = true;
     }
-    this.people.instanceMatrix.needsUpdate = true;
-    this.people.instanceColor.needsUpdate = true;
 
     // smoke hangs under the ceiling and comes down as it thickens; flames flicker
     const hz = r.hazard, top = this.viewer.wallHeight, col = new THREE.Color();
     let burning = 0;
+    const zone = hz.kind === 'zone' ? hz.zone : null, sec = zone ? Math.max(0, Math.min(zone.t - 1, Math.floor(t))) : 0;
     this.blocks.forEach((bl, n) => {
-      const s = smokeAt(hz, bl.i, t);
-      if (s < 0.03) m.makeScale(0, 0, 0);
-      else {
-        m.makeScale(bl.sx, 1, bl.sy).setPosition(bl.x, top - s * (top - 0.5), bl.y);
+      if (zone) {
+        // the zone model's smoke layer: its underside at the computed height, darker with soot
+        const k = hz.roomOf[bl.i];
+        const H = k >= 0 ? hz.net.rooms[k].height : 1, zi = k >= 0 ? zone.zi[k][sec] : H;
+        const ext = k >= 0 ? 8700 * zone.soot[k][sec] : 0;
+        if (k < 0 || zi > H - 0.02 || ext < 0.02) m.makeScale(0, 0, 0);
+        else m.makeScale(bl.sx, 1, bl.sy).setPosition(bl.x, Math.max(0.05, (zi / H) * top), bl.y);
+        this.smoke.setMatrixAt(n, m);
+        this.smoke.setColorAt(n, col.setScalar(0.85 - 0.65 * Math.min(1, ext / 1.5)));
+      } else {
+        const s = smokeAt(hz, bl.i, t);
+        if (s < 0.03) m.makeScale(0, 0, 0);
+        else m.makeScale(bl.sx, 1, bl.sy).setPosition(bl.x, top - s * (top - 0.5), bl.y);
+        this.smoke.setMatrixAt(n, m);
+        this.smoke.setColorAt(n, col.setScalar(0.8 - 0.55 * s));
       }
-      this.smoke.setMatrixAt(n, m);
-      this.smoke.setColorAt(n, col.setScalar(0.8 - 0.55 * s));
       const age = t - hz.fireT[bl.i];
       if (age < 0) m.makeScale(0, 0, 0);
       else {
@@ -187,7 +242,8 @@ export class SimLayer {
     this.smoke.instanceColor.needsUpdate = true;
     this.flames.instanceMatrix.needsUpdate = true;
     this.flames.instanceColor.needsUpdate = true;
-    this.light.intensity = burning ? Math.min(40, 4 + burning * 0.6) : 0;
+    if (this.light) this.light.intensity = zone ? Math.min(40, zone.Q[sec] / 100) : burning ? Math.min(40, 4 + burning * 0.6) : 0;
+    this.quakeView?.update(t);
     this.updateProjections(t);
   }
 
@@ -292,20 +348,20 @@ export class SimLayer {
     const r = this.result;
     const a = Math.min(r.frames.times.length - 1, Math.max(0, Math.floor(t / r.frames.every)));
     const S = r.frames.state[a];
-    const n = [0, 0, 0, 0, 0];
+    const n = new Array(8).fill(0);
     for (const s of S) n[s]++;
-    return { waiting: n[STATE.WAITING], moving: n[STATE.MOVING], out: n[STATE.OUT], overcome: n[STATE.OVERCOME], trapped: n[STATE.TRAPPED] };
+    return { waiting: n[STATE.WAITING], moving: n[STATE.MOVING], out: n[STATE.OUT], overcome: n[STATE.OVERCOME], trapped: n[STATE.TRAPPED], assist: n[STATE.ASSIST], injured: n[STATE.INJURED] };
   }
 }
 
 // two indexed geometries into one (keeps three's addons out of the import list)
-function mergeGeometries(a, b) {
-  a = a.toNonIndexed(); b = b.toNonIndexed();
+function mergeGeometries(...geos) {
+  const flat = geos.map((x) => x.toNonIndexed());
   const g = new THREE.BufferGeometry();
   for (const name of ['position', 'normal']) {
-    const A = a.getAttribute(name).array, B = b.getAttribute(name).array;
-    const arr = new Float32Array(A.length + B.length);
-    arr.set(A); arr.set(B, A.length);
+    const arr = new Float32Array(flat.reduce((t, x) => t + x.getAttribute(name).array.length, 0));
+    let o = 0;
+    for (const x of flat) { arr.set(x.getAttribute(name).array, o); o += x.getAttribute(name).array.length; }
     g.setAttribute(name, new THREE.BufferAttribute(arr, 3));
   }
   return g;

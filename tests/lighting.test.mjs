@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import * as THREE from '../frontend/vendor/three.module.js';
 const code=fs.readFileSync(new URL('../frontend/src/viewer3d.js',import.meta.url),'utf8')
  .replace("'three'",JSON.stringify(new URL('../frontend/vendor/three.module.js',import.meta.url).href))
+ .replace("'./objects.js'",JSON.stringify(new URL('../frontend/src/objects.js',import.meta.url).href))
  .replace(/^import .*Controls.*;$/gm,'');
 const {Viewer}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 test('playback dims exterior and restores exact idle colours and lighting',()=>{
