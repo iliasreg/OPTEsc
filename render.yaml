@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: optesc-demo
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: feat/render-demo-hosting
+    autoDeployTrigger: "off"
+    buildCommand: python -m compileall -q tools
+    startCommand: python tools/drill_rag.py --host 0.0.0.0
+    healthCheckPath: /healthz
+    numInstances: 1
+    envVars:
+      - key: API_KEY
+        sync: false
+      - key: AMD_BASE_URL
+        value: https://developer.amd.com.cn/radeon/api/v1
+      - key: AMD_MODEL
+        value: Qwen3.8-27B
+      - key: MODEL_CALLS_PER_HOUR
+        value: "60"
+      - key: MODEL_MAX_CONCURRENCY
+        value: "2"
+      - key: MODEL_CACHE_SIZE
+        value: "64"
+      - key: MAX_BODY_BYTES
+        value: "2048"

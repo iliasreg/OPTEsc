@@ -3,7 +3,7 @@
 Run: python tools/drill_rag.py [--port 8767]
 AMD_BASE_URL is the configured OpenAI-compatible base (including /v1 if needed)
 or full /chat/completions URL; AMD_MODEL names the model. API_KEY is read only
-from ~/.amd.env. No provider destination is guessed.
+from the environment or ~/.amd.env. No provider destination is guessed.
 """
 
 import argparse
@@ -11,9 +11,12 @@ import json
 import os
 import re
 import shlex
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import OrderedDict, deque
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -49,6 +52,17 @@ class MissingConfig(Exception):
     pass
 
 
+class ModelLimit(Exception):
+    pass
+
+
+def env_int(name, default, minimum, maximum):
+    value = int(os.environ.get(name, str(default)))
+    if not minimum <= value <= maximum:
+        raise ValueError(f"{name} is outside its allowed range")
+    return value
+
+
 def load_config(env_file=Path.home() / ".amd.env"):
     values = {
         "AMD_BASE_URL": "https://developer.amd.com.cn/radeon/api/v1",
@@ -65,7 +79,7 @@ def load_config(env_file=Path.home() / ".amd.env"):
                     values[key] = value
     except (OSError, ValueError):
         pass
-    for key in ("AMD_BASE_URL", "AMD_MODEL"):
+    for key in ("AMD_BASE_URL", "AMD_MODEL", "API_KEY"):
         if key in os.environ:
             values[key] = os.environ[key]
     return values
@@ -140,6 +154,14 @@ class Service:
         self.corpus_dir = Path(corpus_dir)
         self.config = load_config() if config is None else config
         self.infer = infer or (lambda prompt: infer_provider(prompt, self.config))
+        # One Service per process: all clients share this quota, never X-Forwarded-For.
+        self.model_budget = env_int("MODEL_CALLS_PER_HOUR", 60, 0, 10000)
+        self.model_concurrency = env_int("MODEL_MAX_CONCURRENCY", 2, 1, 32)
+        self.cache_size = env_int("MODEL_CACHE_SIZE", 64, 1, 64)
+        self._model_lock = threading.Lock()
+        self._model_calls = deque()
+        self._inflight = set()
+        self._model_cache = OrderedDict()
 
     def corpus(self):
         try:
@@ -377,8 +399,37 @@ class Service:
             ],
         }
         selection = sorted(candidates)
+        key = (
+            SITE_ID,
+            binding["fingerprint"],
+            situation["scenario"],
+            situation["zone_id"],
+        )
+        reserved = False
+        limit_error = None
+        with self._model_lock:
+            now = time.monotonic()
+            while self._model_calls and self._model_calls[0] <= now - 3600:
+                self._model_calls.popleft()
+            cached = self._model_cache.get(key)
+            if cached is not None:
+                self._model_cache.move_to_end(key)
+            elif key in self._inflight or len(self._inflight) >= self.model_concurrency:
+                limit_error = "model_busy"
+            elif len(self._model_calls) >= self.model_budget:
+                limit_error = "model_budget_exhausted"
+            else:
+                self._model_calls.append(now)
+                self._inflight.add(key)
+                reserved = True
         try:
-            answer = self.infer(prompt)
+            if limit_error:
+                raise ModelLimit(limit_error)
+            answer = (
+                {"action_ids": list(cached)}
+                if cached is not None
+                else self.infer(prompt)
+            )
             if not isinstance(answer, dict) or set(answer) != {"action_ids"}:
                 raise InvalidSelection()
             ids = answer["action_ids"]
@@ -401,12 +452,24 @@ class Service:
                 )
             )
             result["mode"] = "model"
+        except ModelLimit:
+            result["error"] = limit_error
         except MissingConfig:
             result["error"] = "missing_config"
         except InvalidSelection:
             result["error"] = "invalid_selection"
         except Exception:
             result["error"] = "provider_error"
+        finally:
+            with self._model_lock:
+                if reserved:
+                    if result["mode"] == "model":
+                        self._model_cache[key] = tuple(selection)
+                        while len(self._model_cache) > self.cache_size:
+                            self._model_cache.popitem(last=False)
+                    self._inflight.discard(key)
+                elif cached is not None and result["mode"] != "model":
+                    self._model_cache.pop(key, None)
         result["actions"] = [
             {
                 "id": aid,
@@ -425,6 +488,26 @@ class Service:
 
 
 def make_handler(service, frontend=ROOT / "frontend"):
+    public_url = os.environ.get(
+        "PUBLIC_BASE_URL", os.environ.get("RENDER_EXTERNAL_URL", "")
+    )
+    public = urllib.parse.urlsplit(public_url)
+    if public_url and (
+        public.scheme != "https"
+        or not public.hostname
+        or public.username is not None
+        or public.password is not None
+        or public.path not in {"", "/"}
+        or public.query
+        or public.fragment
+        or any(c.isspace() for c in public_url)
+    ):
+        raise ValueError("public URL must be an HTTPS origin")
+    if public_url:
+        public.port  # Reject malformed ports before accepting requests.
+    public_origin = "https://" + public.netloc
+    max_body = env_int("MAX_BODY_BYTES", MAX_BODY, 1, 65536)
+
     class Handler(SimpleHTTPRequestHandler):
         # Windows' registry does not know these: browsers refuse a module or wasm sent as text.
         extensions_map = {
@@ -472,11 +555,20 @@ def make_handler(service, frontend=ROOT / "frontend"):
             hosts = {f"localhost:{port}", f"127.0.0.1:{port}"}
             host = self.headers.get("Host", "")
             origin = self.headers.get("Origin")
+            if (
+                len(self.headers.get_all("Host", [])) != 1
+                or len(self.headers.get_all("Origin", [])) > 1
+            ):
+                return False
+            if public_url and host == public.netloc:
+                return origin is None or origin == public_origin
             return host in hosts and (origin is None or origin == "http://" + host)
 
         def do_GET(self):
             if not self.local_request():
                 return self.reply(403, {"error": "forbidden_origin"})
+            if self.path == "/healthz":
+                return self.reply(200, {"status": "ok"})
             if self.path == "/api/drill-reference":
                 return self.reply(200, service.reference())
             if self.path == "/api/rag-status":
@@ -521,7 +613,7 @@ def make_handler(service, frontend=ROOT / "frontend"):
                 if len(lengths) != 1 or self.headers.get("Transfer-Encoding"):
                     raise RequestError("invalid_length")
                 size = int(lengths[0])
-                if not 0 < size <= MAX_BODY:
+                if not 0 < size <= max_body:
                     return self.reply(413, {"error": "body_too_large"})
                 payload = json.loads(self.rfile.read(size))
                 result = service.guidance(payload)
@@ -536,12 +628,13 @@ def make_handler(service, frontend=ROOT / "frontend"):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8767)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=os.environ.get("PORT", "8767"))
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(Service()))
-    print(f"Drill prototype: http://localhost:{args.port} (localhost only)", flush=True)
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(Service()))
+    print(f"Drill prototype listening on {args.host}:{args.port}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
