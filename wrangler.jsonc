@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "optesc-demo",
+  "main": "cloudflare/worker.js",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": true,
+  "preview_urls": false,
+  "build": {
+    "command": "python3 tools/prepare_cloudflare.py"
+  },
+  "assets": {
+    "directory": "./.cloudflare/assets",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api", "/api/*", "/healthz"],
+    "not_found_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "GUIDANCE", "class_name": "GuidanceGate" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GuidanceGate"] }
+  ],
+  "vars": {
+    "PUBLIC_BASE_URL": "https://optesc-demo.iliasreg-optesc.workers.dev",
+    "AMD_BASE_URL": "https://developer.amd.com.cn/radeon/api/v1",
+    "AMD_MODEL": "Qwen3.8-27B",
+    "MODEL_CALLS_PER_HOUR": "60",
+    "MODEL_MAX_CONCURRENCY": "2",
+    "MODEL_CACHE_SIZE": "64",
+    "MAX_BODY_BYTES": "2048"
+  },
+  "observability": { "enabled": false }
+}

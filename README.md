@@ -4,6 +4,8 @@ Turn a floor plan into an interactive 3D building, run a fire drill, and follow 
 
 A software prototype—not a live emergency system or a building-compliance assessment.
 
+Live demo: [Open OPTEsc](https://optesc-demo.iliasreg-optesc.workers.dev).
+
 ## Run
 
 Requires Python 3.12+, Bash and a modern browser. No GPU, model download or API key is needed for the default demo.
