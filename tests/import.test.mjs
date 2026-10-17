@@ -22,15 +22,18 @@ function harness() {
     addEventListener: (event, fn) => { listeners[`${id}:${event}`] = fn; },
     classList: { add() {}, remove() {} },
   }]));
+  const site = {zones:[{id:'Z1'}]};
   const context = vm.createContext({
+    welcome:null, sceneReady:Promise.resolve(),state:{site},
+    document:{visibilityState:'visible'},requestAnimationFrame:fn=>fn(),setTimeout:fn=>fn(),
     $: id => elements[id], console: { error() {} },
-    viewer: {renderer: {setAnimationLoop() {}}, _tick() {}},
+    viewer: {site,renderer: {setAnimationLoop() {}}, _tick() {},_resize() {}},
     setStatus: (...args) => statuses.push(args),
     loadDxf: async (text, name) => loaded.push(['dxf', text, name]),
     loadPdf: async (...args) => loaded.push(['pdf', args[1]]),
     loadImage: async (...args) => loaded.push(['image', args[1]]),
     loadSiteJson() {}, openIfc() {},
-    URL: { createObjectURL: () => 'blob:plan' },
+    URL: { createObjectURL: () => 'blob:plan', revokeObjectURL() {} },
     PLAN_FILE: /\.(dxf|pdf|png|jpe?g|webp|bmp|gif)$/i,
   });
   vm.runInContext(main.slice(main.indexOf('let importGeneration'), main.indexOf('// Render the DXF')), context);

@@ -8,10 +8,12 @@ const deferred = () => { let resolve, reject; const promise = new Promise((a,b) 
 function harness() {
   const pdf = deferred(), image = deferred(), ocr = deferred(), fetches = new Map();
   const loaded = [], statuses = [], loops = [], elements = new Map();
+  const site={zones:[{id:'Z1'}]};
   const context = vm.createContext({
-    state: {scaleFrom: 'drawing', pxPerM: 30},
+    welcome:null,sceneReady:Promise.resolve(),requestAnimationFrame:fn=>fn(),setTimeout:fn=>fn(),
+    state: {site,scaleFrom: 'drawing', pxPerM: 30},
     $: id => { if (!elements.has(id)) elements.set(id, {value:'40',addEventListener(){},classList:{add(){},remove(){}}}); return elements.get(id); },
-    viewer: {renderer:{setAnimationLoop:fn=>loops.push(fn)},_tick(){}},
+    viewer: {site,renderer:{setAnimationLoop:fn=>loops.push(fn)},_tick(){},_resize(){}},
     setStatus: (...args)=>statuses.push(args), console:{error(){}},
     Image: class {naturalWidth=100; naturalHeight=100; decode(){return image.promise;}},
     document:{createElement:()=>({getContext:()=>({fillRect(){},drawImage(){}})})},
@@ -66,7 +68,10 @@ test('file selection order wins over asynchronous file reads',async()=>{
 });
 
 test('sample selection order wins over asynchronous fetches',async()=>{
-  const h=harness();const earlier=h.context.loadSample('pdf');const latest=h.context.loadSample('dxf');
+  const h=harness();const earlier=h.context.loadSample('pdf');
+  await new Promise(r=>setImmediate(r));
+  const latest=h.context.loadSample('dxf');
+  await new Promise(r=>setImmediate(r));
   h.fetches.get('dxf').resolve({text:async()=> 'new'});await latest;
   h.fetches.get('pdf').resolve({arrayBuffer:async()=>new ArrayBuffer(0)});
   h.pdf.resolve({canvas:'pdf',pxPerM:30,texts:[]});await earlier;

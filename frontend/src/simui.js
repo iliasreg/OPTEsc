@@ -120,7 +120,7 @@ export function initSim({ viewer, getSite, setStatus }) {
   function siteChanged() {
     stop();
     guidance.siteChanged();
-    void equipment.siteChanged().then(() => { kit = null; ensureKit(); });
+    const ready = equipment.siteChanged().then(() => { kit = null; return ensureKit(); });
     kit = null;
     layer.clear();
     $('player').hidden = true;
@@ -131,10 +131,11 @@ export function initSim({ viewer, getSite, setStatus }) {
     const keep = sel.value;
     sel.innerHTML = '';
     $('sim-stairs-row').hidden = !(s?.objects || []).some((o) => o.kind === 'stair');
-    if (!s) return;
+    if (!s) return ready;
     const byArea = [...s.zones].sort((a, b) => b.area_m2 - a.area_m2);
     for (const z of byArea) sel.add(new Option(z.name, z.id));
     if (s.zones.some((z) => z.id === keep)) sel.value = keep;
+    return ready;
   }
 
   async function run(fire = null) {
