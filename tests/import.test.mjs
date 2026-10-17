@@ -24,14 +24,16 @@ function harness() {
   }]));
   const context = vm.createContext({
     $: id => elements[id], console: { error() {} },
+    viewer: {renderer: {setAnimationLoop() {}}, _tick() {}},
     setStatus: (...args) => statuses.push(args),
-    loadDxf: async (...args) => loaded.push(['dxf', ...args]),
+    loadDxf: async (text, name) => loaded.push(['dxf', text, name]),
     loadPdf: async (...args) => loaded.push(['pdf', args[1]]),
     loadImage: async (...args) => loaded.push(['image', args[1]]),
     loadSiteJson() {}, openIfc() {},
     URL: { createObjectURL: () => 'blob:plan' },
     PLAN_FILE: /\.(dxf|pdf|png|jpe?g|webp|bmp|gif)$/i,
   });
+  vm.runInContext(main.slice(main.indexOf('let importGeneration'), main.indexOf('// Render the DXF')), context);
   vm.runInContext(main.slice(main.indexOf("$('file').addEventListener"), main.indexOf('async function loadSample')), context);
   return { listeners, statuses, loaded };
 }

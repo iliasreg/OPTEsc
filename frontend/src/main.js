@@ -36,6 +36,14 @@ const editor = new Editor($('edit-canvas'), { onChange: () => resegment() });
 
 // ---------- loading ----------
 
+let importGeneration = 0;
+function beginImport() {
+  const generation = ++importGeneration;
+  // A new import releases a render loop paused by an older OCR task.
+  viewer.renderer.setAnimationLoop(() => viewer._tick());
+  return () => generation === importGeneration;
+}
+
 // Render the DXF to a canvas with its scale and text.
 function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], unitsGuessed = null, note = '', objects = [], frame = null }) {
   state.source = cv;
@@ -104,11 +112,13 @@ function autoScale() {
 
 // A picture of a plan: walls from the drawing, room names read from the image (offline), scale
 // from the printed room sizes, the doors or the walls unless the width is given.
-async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length } = {}) {
+async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length, current = beginImport() } = {}) {
+  if (!current()) return;
   setStatus('Reading plan…');
   const img = new Image();
   img.src = src;
   await img.decode();
+  if (!current()) return;
   const scale = Math.min(1, 2200 / Math.max(img.naturalWidth, img.naturalHeight));
   const cv = document.createElement('canvas');
   cv.width = Math.round(img.naturalWidth * scale);
@@ -131,7 +141,9 @@ async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length } 
     // nothing moves on screen meanwhile: pause the 3D view so the text reader gets the processor
     viewer.renderer.setAnimationLoop(null);
     try {
-      const t = await readPlanText(cv, setStatus).finally(() => viewer.renderer.setAnimationLoop(() => viewer._tick()));
+      const t = await readPlanText(cv, (message, error) => { if (current()) setStatus(message, error); })
+        .finally(() => { if (current()) viewer.renderer.setAnimationLoop(() => viewer._tick()); });
+      if (!current()) return;
       state.hints = t.labels;
       state.textBoxes = t.textBoxes;
       if (!state.pxPerM && state.scaleFrom !== 'typed') process();
@@ -139,6 +151,7 @@ async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length } 
       const n = t.labels.filter((l) => l.name).length;
       setStatus(`Read ${n} room name${n === 1 ? '' : 's'} on the plan.`);
     } catch (err) {
+      if (!current()) return;
       setStatus(`Could not read the text on the plan (${err.message}). Rooms are unnamed.`, true);
       console.error(err);
     }
@@ -147,9 +160,11 @@ async function loadImage(src, name, widthM, hints = [], { ocr = !hints.length } 
 }
 
 // A PDF drawing: its lines and text; the scale from a note such as "1:100" when there is one.
-async function loadPdf(buffer, name) {
+async function loadPdf(buffer, name, current = beginImport()) {
+  if (!current()) return;
   setStatus('Reading PDF…');
   const r = await renderPdf(buffer);
+  if (!current()) return;
   if (!r.pxPerM) state.scaleFrom = 'walls';
   loadCanvas(r.canvas, {
     name, kind: 'pdf', pxPerM: r.pxPerM, hints: textHints(r.texts, r.pxPerM || 30),
@@ -170,7 +185,8 @@ function scaleNote() {
   }[state.scaleFrom] || '';
 }
 
-async function loadDxf(text, name) {
+async function loadDxf(text, name, current = beginImport()) {
+  if (!current()) return;
   setStatus('Reading DXF…');
   const r = renderDxf(text);
   const walls = r.layers.filter((l) => l.wall).map((l) => l.name);
@@ -514,16 +530,17 @@ $('file').addEventListener('change', (e) => {
   e.target.value = '';
 });
 function handleFile(f) {
+  const current = beginImport();
   if (!PLAN_FILE.test(f.name)) {
     setStatus('Open a plan as DXF, PDF or an image (PNG, JPG).', true);
     return;
   }
   const name = f.name.replace(/\.[^.]+$/, '');
-  const fail = (err) => { setStatus(`Could not read ${f.name}: ${err.message}`, true); console.error(err); };
+  const fail = (err) => { if (!current()) return; setStatus(`Could not read ${f.name}: ${err.message}`, true); console.error(err); };
   const ext = f.name.split('.').pop().toLowerCase();
-  if (ext === 'dxf') f.text().then((t) => loadDxf(t, name)).catch(fail);
-  else if (ext === 'pdf') f.arrayBuffer().then((b) => loadPdf(b, name)).catch(fail);
-  else loadImage(URL.createObjectURL(f), name, null).catch(fail);
+  if (ext === 'dxf') f.text().then((t) => loadDxf(t, name, current)).catch(fail);
+  else if (ext === 'pdf') f.arrayBuffer().then((b) => loadPdf(b, name, current)).catch(fail);
+  else loadImage(URL.createObjectURL(f), name, null, [], { current }).catch(fail);
 }
 const drop = $('main');
 drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
@@ -538,11 +555,12 @@ drop.addEventListener('drop', (e) => {
 async function loadSample(kind) {
   const s = SAMPLES[kind];
   if (!s) return;
+  const current = beginImport();
   try {
-    if (kind === 'dxf') await loadDxf(await (await fetch(s.url)).text(), 'Sample factory');
-    if (kind === 'pdf') await loadPdf(await (await fetch(s.url)).arrayBuffer(), 'Sample factory');
-    if (kind === 'png') await loadImage(s.url, 'Sample factory', s.widthM, s.hints);
-  } catch (err) { setStatus(`Could not load the sample: ${err.message}`, true); console.error(err); }
+    if (kind === 'dxf') await loadDxf(await (await fetch(s.url)).text(), 'Sample factory', current);
+    if (kind === 'pdf') await loadPdf(await (await fetch(s.url)).arrayBuffer(), 'Sample factory', current);
+    if (kind === 'png') await loadImage(s.url, 'Sample factory', s.widthM, s.hints, { current });
+  } catch (err) { if (!current()) return; setStatus(`Could not load the sample: ${err.message}`, true); console.error(err); }
 }
 $('sample').addEventListener('change', (e) => loadSample(e.target.value));
 for (const id of ['p-width', 'p-cell', 'p-door', 'p-filter']) {
