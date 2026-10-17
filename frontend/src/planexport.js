@@ -1,4 +1,4 @@
-// The projector and camera plan as a one-page PDF (A3 landscape) and as a DXF for CAD. Both say
+// The projector and camera plan as an A3 landscape PDF and as a DXF for CAD. Both say
 // where every projector and camera goes, what each one is for, and how they were placed. Pure
 // module: builds the files as bytes or text, without the page.
 
@@ -92,19 +92,23 @@ class Page {
   }
 }
 
-function pdfFile(page) {
-  const content = page.ops.join('\n');
+function pdfFile(pages) {
   const objs = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.W} ${page.H}] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /ExtGState << /A1 7 0 R /A2 8 0 R /A3 9 0 R >> >> >>`,
-    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    `<< /Type /Pages /Kids [${pages.map((_, k) => `${8 + 2 * k} 0 R`).join(' ')}] /Count ${pages.length} >>`,
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>',
     '<< /Type /ExtGState /ca 0.14 /CA 0.5 >>',
     '<< /Type /ExtGState /ca 0.6 /CA 0.6 >>',
     '<< /Type /ExtGState /ca 1 /CA 1 >>',
   ];
+  for (const page of pages) {
+    const content = page.ops.join('\n'), streamId = objs.length + 2;
+    objs.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${page.W} ${page.H}] /Contents ${streamId} 0 R /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /ExtGState << /A1 5 0 R /A2 6 0 R /A3 7 0 R >> >> >>`,
+      `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    );
+  }
   let out = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
   const offsets = [];
   objs.forEach((o, k) => { offsets.push(out.length); out += `${k + 1} 0 obj\n${o}\nendobj\n`; });
@@ -246,7 +250,48 @@ export function planPdf(site, plan, { date = new Date() } = {}) {
       }
     });
   }
-  return pdfFile(pg);
+  const pages = [pg];
+  if (!layout) {
+    pg.text(cx0, top + legendH + 14, 'Placement method and device schedules continue on page 2.', 10);
+    const fs = 10, lh = 13, width = W - 2 * M, bottom = H - M;
+    let page, y;
+    const nextPage = () => {
+      page = new Page(W, H);
+      pages.push(page);
+      page.text(M, M + 16, T.title, 17, { bold: true });
+      page.text(M, M + 32, `Placement method and device schedules · Page ${pages.length}`, 10, { color: COLOR.muted });
+      y = top;
+    };
+    nextPage();
+    for (const sec of sections) {
+      const sectionHeading = (continued = false) => {
+        page.text(M, y + 14, `${sec.head}${continued ? ' (continued)' : ''}`, 12, { bold: true });
+        y += 24;
+      };
+      if (y + 24 + lh > bottom) nextPage();
+      sectionHeading();
+      for (const it of sec.items) {
+        const idw = textWidth(`${it.id} `, fs, true);
+        const lines = wrap(`${it.sub ? `${it.sub} — ` : ''}${it.text}`, width - idw, fs);
+        // Keep normal entries together; exceptionally long reasons can span pages.
+        if (y + lines.length * lh + 5 > bottom && y > top + 24) {
+          nextPage();
+          sectionHeading(true);
+        }
+        for (let n = 0; n < lines.length; n++) {
+          if (y + lh > bottom) {
+            nextPage();
+            sectionHeading(true);
+          }
+          if (n === 0) page.text(M, y + fs, it.id, fs, { bold: true, color: it.color || COLOR.text });
+          page.text(M + idw, y + fs, lines[n], fs);
+          y += lh;
+        }
+        y += 5;
+      }
+    }
+  }
+  return pdfFile(pages);
 }
 
 // ---------- DXF ----------
