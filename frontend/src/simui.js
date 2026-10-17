@@ -7,7 +7,7 @@ import { BUILDINGS } from './quake.js';
 import { initExtinguisherTraining } from './extinguishertraining.js';
 import { initDrillGuidance, siteFingerprint, drillExitIds } from './drillguidance.js';
 import { DrillSound } from './drillsound.js';
-import { equipmentPlan, cameraView } from './equipment.js';
+import { reviewedEquipmentPlan, cameraView } from './equipment.js';
 import { EquipmentView } from './equipmentview.js';
 import { planPdf, planDxf } from './planexport.js';
 
@@ -25,12 +25,15 @@ export function initSim({ viewer, getSite, setStatus }) {
   // projectors and cameras: placed for the plan, drawn in 3D, exported as a drawing
   const kitView = new EquipmentView(viewer);
   let kit = null, kitKey = '';
-  function ensureKit() {
+  const equipmentKey = (s) => JSON.stringify([s.grid, s.zones, s.doors, viewer.wallHeight, equipment.station]);
+  async function ensureKit() {
     const s = getSite();
     if (!s) { kit = null; kitView.setPlan(null); return null; }
-    const st = equipment.station, key = `${s.grid.w}x${s.grid.h}:${s.doors.length}:${viewer.wallHeight}:${st ? st.x : ''}`;
+    const st = equipment.station, key = equipmentKey(s);
     if (kit && kit.site === s && kitKey === key) return kit;
-    kit = { site: s, plan: equipmentPlan(s, { wallHeight: viewer.wallHeight, station: st }) };
+    const plan = await reviewedEquipmentPlan(s, { wallHeight: viewer.wallHeight, station: st });
+    if (s !== getSite() || key !== equipmentKey(s)) return null;
+    kit = { site: s, plan };
     kit.seen = cameraView(s, kit.plan.cameras);
     kitKey = key;
     kitView.setPlan(kit.plan);
@@ -155,7 +158,7 @@ export function initSim({ viewer, getSite, setStatus }) {
       let r;
       try { r = await call('run', { ...simSite(s), evacuationExitIds }, opts()); } finally { viewer.renderer.setAnimationLoop(() => viewer._tick()); }
       if (token !== revision || s !== getSite()) return;
-      { const k = ensureKit(); layer.setKit(k?.plan || null, k?.seen || null); }
+      { const k = await ensureKit(); if (token !== revision || s !== getSite()) return; layer.setKit(k?.plan || null, k?.seen || null); }
       layer.show(r, s);
       sound.load(r);
       guidance.start(r, s);
@@ -408,14 +411,14 @@ export function initSim({ viewer, getSite, setStatus }) {
   };
   const slug = () => (getSite()?.name || 'site').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
   // View → Export (the buttons are made by workspace.js, after this runs)
-  document.addEventListener('click', (e) => {
+  document.addEventListener('click', async (e) => {
     const id = e.target?.id;
     if (id !== 'export-pdf' && id !== 'export-dxf') return;
-    const k = ensureKit();
-    if (!k) { setStatus('Open a plan first.', true); return; }
     try {
-      if (id === 'export-pdf') save(planPdf(getSite(), k.plan), `${slug()}_projectors_cameras.pdf`, 'application/pdf');
-      else save(planDxf(getSite(), k.plan), `${slug()}_projectors_cameras.dxf`, 'application/dxf');
+      const k = await ensureKit();
+      if (!k) { setStatus('Open a plan first, or retry after the plan finishes changing.', true); return; }
+      if (id === 'export-pdf') save(planPdf(k.site, k.plan), `${slug()}_projectors_cameras.pdf`, 'application/pdf');
+      else save(planDxf(k.site, k.plan), `${slug()}_projectors_cameras.dxf`, 'application/dxf');
       setStatus(`${id === 'export-pdf' ? 'PDF' : 'DXF'} exported. ${k.summary}`);
     } catch (err) { setStatus(`Export failed: ${err.message}`, true); console.error(err); }
   });

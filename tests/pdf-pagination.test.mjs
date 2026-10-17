@@ -53,7 +53,8 @@ function assertExplanations(pages, expected) {
 }
 
 test('large hall PDF preserves placement explanations and every device schedule on readable continuation pages', () => {
-  const site = hall(100, 60), plan = equipmentPlan(site, { wallHeight: 3 });
+  const site = hall(100, 60);
+  const plan = equipmentPlan(site, { wallHeight: 3, evacuationExitIds: site.doors.filter(d => d.is_exit).map(d => d.id) });
   assert.equal(plan.projectors.length, 43);
   assert.equal(plan.cameras.length, 49);
   const pages = readPdf(planPdf(site, plan));

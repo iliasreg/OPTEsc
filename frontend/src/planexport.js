@@ -6,16 +6,23 @@
 
 const f1 = (v) => Math.round(v * 10) / 10;
 const pct = (v) => `${Math.round(v * 100)}%`;
+const exitLabel = (plan, id) => plan.exitPolicy?.approved.includes(id) ? `EXIT ${id}`
+  : `${plan.exitPolicy?.reviewed ? 'EXCLUDED' : 'UNREVIEWED'} ${id}`;
 
 export function planText(site, plan) {
   const P = plan.params.projector, C = plan.params.camera, cov = plan.coverage;
   const zname = (id) => site.zones.find((z) => z.id === id)?.name || id || '';
   const height = plan.projectors[0]?.z ?? plan.params.wallHeight - P.below;
+  const approved = plan.exitPolicy?.approved || [];
+  const excluded = (plan.exitPolicy?.candidates || []).filter(id => !approved.includes(id));
   const how = [
-    ['Signs', 'At every door people walk through to get out (normally, or when one exit is blocked): a sign on the floor in front of the door, an EXIT sign above each exit, and an arrow 3 m before the door. Large rooms also get arrows about every 8 m.'],
+    ['Exit policy', plan.exitPolicy?.reviewed
+      ? `Reviewed software-drill exits: ${approved.join(', ')}. Excluded candidates: ${excluded.join(', ') || 'none'}. Imported geometry is unchanged; this is not approval for real emergencies.`
+      : 'No reviewed exit policy for this geometry. All imported exit candidates are unreviewed; no evacuation directions are approved.'],
+    ['Signs', approved.length ? 'Only routes to reviewed software-drill exits get evacuation signs: a floor sign at each door on the route, an EXIT sign above each approved exit, and approach arrows. Excluded candidates are not evacuation destinations.' : 'Floor sign spots reserve equipment coverage only; evacuation arrows and EXIT signs are unavailable until a site-specific exit policy is reviewed.'],
     ['Projectors', `One on the ceiling 2 m inside the room from each of those doors, so it lights that door's signs; doors close together share one. Then one over each pair of room arrows. A projector only lights its own room, never through a doorway.`],
     ['Cameras', `In a corner of each room, looking diagonally across it, as installers usually do. A second camera (in another corner or on a wall) only where one cannot see ${pct(C.floorShare)} of the room; hung from the ceiling only in open areas far from any wall. Every door is watched from at least one side, and no two cameras face each other.`],
-    ['In an emergency', `The cameras spot where a fire starts, which walls fell and which doors jammed (about ${C.delay} s later). The projectors switch on with the alarm, point everyone to the nearest exit that is still open and mark blocked doors as BLOCKED. In an earthquake they show TAKE COVER until the shaking stops.`],
+    ['During a software drill', `The cameras model fire, fallen walls and jammed doors (about ${C.delay} s later). ${approved.length ? 'Evacuation directions use only reviewed drill exits that remain reachable; blocked routes show BLOCKED.' : 'No evacuation directions are enabled for this unreviewed geometry.'} Earthquake signs show TAKE COVER during shaking. Follow approved site procedures in a real emergency.`],
     ['Assumptions', `Projectors on the ceiling at ${f1(height)} m, up to ${P.images} images each, readable up to ${P.maxThrow} m away and at least ${P.minElevation}° from the horizontal. Cameras ${C.fov}° wide and ${C.range} m deep. Furniture is not taken as blocking a camera's view. These positions are a starting point for a site survey, not an installation design.`],
   ];
   const summary = `${plan.projectors.length} projectors and ${plan.cameras.length} cameras · ${cov.targets === 1 ? 'every sign spot is lit' : `${pct(cov.targets)} of sign spots lit`} · the cameras see ${pct(cov.floor)} of the floor and ${cov.doors === 1 ? 'every door' : `${pct(cov.doors)} of the doors`}`;
@@ -152,7 +159,7 @@ export function planPdf(site, plan, { date = new Date() } = {}) {
   const cellColor = { '#': COLOR.wall, W: COLOR.window, D: COLOR.door, E: COLOR.exit };
   for (const b of blocks(g, (ch) => cellColor[ch] || null)) pg.fill(b.v).rect(X(b.x * c), Y(b.y * c), b.len * c * s + 0.2, b.rows * c * s + 0.2);
   for (const z of site.zones) pg.text(X(z.centroid[0]), Y(z.centroid[1]) - 6, z.name, 8, { bold: true, color: COLOR.muted, align: 'center' });
-  for (const d of site.doors || []) if (d.is_exit) pg.text(X(d.x), Y(d.y) - 4, `EXIT ${d.id}`, 6, { bold: true, color: COLOR.sign, align: 'center' });
+  for (const d of site.doors || []) if (d.is_exit) pg.text(X(d.x), Y(d.y) - 4, exitLabel(plan, d.id), 6, { bold: true, color: plan.exitPolicy?.approved.includes(d.id) ? COLOR.sign : COLOR.muted, align: 'center' });
   // what each camera watches (4 m of its view), then projector aims, signs, devices
   pg.alpha('A1');
   for (const cam of plan.cameras) pg.fill(COLOR.cam).stroke(COLOR.cam, 0.4).poly(wedgePts(X(cam.x), Y(cam.y), cam.dir, (cam.fov * Math.PI) / 180, 4 * s), 'B');
@@ -164,7 +171,10 @@ export function planPdf(site, plan, { date = new Date() } = {}) {
   const sym = Math.max(3, Math.min(7, 0.45 * s));
   for (const t of plan.targets) {
     const col = t.projector ? COLOR.sign : COLOR.missed, x = X(t.x), y = Y(t.y);
-    if (t.kind === 'arrow' || t.kind === 'room-arrow') pg.fill(col).poly(arrowPts(x, y, heading(t), sym * 0.8));
+    if (t.kind === 'arrow' || t.kind === 'room-arrow') {
+      if (t.dir) pg.fill(col).poly(arrowPts(x, y, heading(t), sym * 0.8));
+      else pg.stroke(COLOR.muted, 0.5).circle(x, y, sym * 0.6, 'S');
+    }
     else if (t.kind === 'door-sign') pg.stroke(col, 1).rect(x - sym * 0.7, y - sym * 0.7, sym * 1.4, sym * 1.4, 'S');
     else if (t.kind === 'lintel') pg.fill(col).rect(x - sym, y - sym * 0.3, sym * 2, sym * 0.6);
     else pg.fill('#ce3038').circle(x, y, sym * 0.8).text(x, y + sym * 0.35, 'E', sym, { bold: true, color: '#ffffff', align: 'center' });
@@ -336,6 +346,7 @@ export function planDxf(site, plan) {
     poly('A-WALL', [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
   }
   for (const z of site.zones) text('A-AREA-IDEN', z.centroid[0] - 0.1 * z.name.length, z.centroid[1], 0.35, z.name);
+  for (const d of site.doors || []) if (d.is_exit) text('A-ANNO-SIGN', d.x, d.y - 0.4, 0.3, exitLabel(plan, d.id));
   for (const o of site.objects || []) {
     if (!o.polygon?.length) continue;
     if (o.kind === 'stair') {
@@ -357,7 +368,10 @@ export function planDxf(site, plan) {
     for (const id of p.targets) { const t = tById.get(id); if (t) line('A-ANNO-PROJECTOR-AIM', p.x, p.y, t.x, t.y); }
   }
   for (const t of plan.targets) {
-    if (t.kind === 'arrow' || t.kind === 'room-arrow') poly('A-ANNO-SIGN', arrowPts(t.x, t.y, heading(t), 0.45));
+    if (t.kind === 'arrow' || t.kind === 'room-arrow') {
+      if (t.dir) poly('A-ANNO-SIGN', arrowPts(t.x, t.y, heading(t), 0.45));
+      else circle('A-ANNO-SIGN', t.x, t.y, 0.3);
+    }
     else if (t.kind === 'door-sign') poly('A-ANNO-SIGN', [[t.x - 0.4, t.y - 0.4], [t.x + 0.4, t.y - 0.4], [t.x + 0.4, t.y + 0.4], [t.x - 0.4, t.y + 0.4]]);
     else if (t.kind === 'lintel') poly('A-ANNO-SIGN', [[t.x - 0.5, t.y - 0.12], [t.x + 0.5, t.y - 0.12], [t.x + 0.5, t.y + 0.12], [t.x - 0.5, t.y + 0.12]]);
     else circle('A-ANNO-SIGN', t.x, t.y, 0.3);

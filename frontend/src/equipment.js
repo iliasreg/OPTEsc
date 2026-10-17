@@ -16,6 +16,7 @@
 // across the room, as installers do; another on a corner or a wall only where one cannot see the
 // whole room. Each watches its own room and its doors; two cameras never face each other.
 import { prepare, nearestWalkable, routeField, smokeAt } from './sim.js';
+import { siteFingerprint, drillExitIds } from './drillguidance.js';
 import { projectionDoorKind, projectionCellClear, quakeProjectionShaking } from './drillevents.js';
 
 export const PROJECTOR = { images: 6, maxThrow: 9, minElevation: 25, below: 0.25, inset: 2.2, wallMin: 0.8, wallMax: 7, wallAngle: 55, roomArrowEvery: 8 };
@@ -281,7 +282,7 @@ function projectorReason(cx, site, p, byId) {
     parts.push(`${doors.length === 1 ? `Just inside ${room} from ${doorLabel(cx, doors[0], p.zone)}` : `In ${room}, between ${doors.map((d) => doorLabel(cx, d, p.zone)).join(' and ')}`}: lights the floor sign in front of ${doors.length === 1 ? 'the door' : 'each door'}${lintel ? ', the EXIT sign above it' : ''} and the arrow leading to it`);
   }
   const arrows = ts.filter((t) => t.kind === 'room-arrow').length;
-  if (arrows) parts.push(`${parts.length ? 'also' : `Over ${room}:`} ${arrows} floor arrow${arrows > 1 ? 's' : ''} pointing everyone in this part of the room to the nearest open exit`);
+  if (arrows) parts.push(`${parts.length ? 'also' : `Over ${room}:`} ${arrows} floor sign spot${arrows > 1 ? 's' : ''}${ts.some(t => t.kind === 'room-arrow' && t.dir) ? ' pointing toward the nearest open approved drill exit' : '; evacuation direction unavailable without a reviewed reachable exit'}`);
   if (ts.some((t) => t.kind === 'training')) parts.push(`${parts.length ? 'and' : 'In front of the extinguisher:'} the four extinguisher steps on the wall beside it`);
   return `${parts.join('; ')}.`;
 }
@@ -464,8 +465,27 @@ export function cameraView(site, cameras) {
   return seen;
 }
 
+// Bind browser equipment/export planning to the same exact geometry as runtime signs.
+export async function reviewedEquipmentPlan(site, opts = {}) {
+  const snapshot = structuredClone(site);
+  let evacuationExitIds = [];
+  try { evacuationExitIds = drillExitIds(await siteFingerprint(snapshot)); }
+  catch { /* Unbound geometry remains exportable, but has no approved evacuation exits. */ }
+  return equipmentPlan(snapshot, { ...opts, evacuationExitIds });
+}
+
 // The whole plan: sign spots, projectors, cameras, and how well they cover the building.
 export function equipmentPlan(site, opts = {}) {
+  const evacuationExitIds = opts.evacuationExitIds ?? site.evacuationExitIds ?? [];
+  const approved = new Set(evacuationExitIds);
+  const exitPolicy = {
+    approved: (site.doors || []).filter(d => d.is_exit && approved.has(d.id)).map(d => d.id),
+    candidates: (site.doors || []).filter(d => d.is_exit).map(d => d.id),
+    reviewed: evacuationExitIds.length > 0,
+  };
+  // Policy is a planning overlay, never a rewrite of the imported geometry.
+  site = { ...site, evacuationExitIds: exitPolicy.approved,
+    doors: (site.doors || []).map(d => ({ ...d, is_exit: d.is_exit && approved.has(d.id) })) };
   const targets = projectionTargets(site, opts);
   const { projectors, missed } = placeProjectors(site, targets, opts);
   const cams = placeCameras(site, opts);
@@ -473,7 +493,7 @@ export function equipmentPlan(site, opts = {}) {
   for (const p of projectors) for (const t of p.targets) owner.set(t, p.id);
   for (const t of targets) t.projector = owner.get(t.id) || null;
   return {
-    targets, projectors, cameras: cams.cameras,
+    targets, projectors, cameras: cams.cameras, exitPolicy,
     coverage: { targets: targets.length ? (targets.length - missed.length) / targets.length : 1, targets_missed: missed, floor: cams.floor_seen, rooms: cams.rooms_seen, doors: cams.doors_seen, doors_unseen: cams.doors_unseen },
     params: { projector: PROJECTOR, camera: CAMERA, wallHeight: opts.wallHeight ?? 2.6 },
   };
