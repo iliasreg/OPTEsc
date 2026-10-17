@@ -1,4 +1,8 @@
 node_modules/
+.wrangler/
+.cloudflare/
+.dev.vars
+.dev.vars.*
 .venv/
 __pycache__/
 *.py[cod]
