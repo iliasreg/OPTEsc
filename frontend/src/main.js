@@ -6,6 +6,7 @@ import { readPlanText } from './ocr.js';
 import { siteToIfc } from './ifc.js';
 import { initSim } from './simui.js';
 import { placeObjects } from './objects.js';
+import { initWelcome } from './welcome.js';
 
 const $ = (id) => document.getElementById(id);
 const ZONE_TYPES = Object.keys(TYPE_COLORS);
@@ -29,6 +30,8 @@ const SAMPLES = {
 const PLAN_FILE = /\.(dxf|pdf|png|jpe?g|webp|bmp|gif)$/i;
 
 const state = { source: null, base: null, edits: null, seg: null, site: null, plan: null, dist: null, name: 'Imported plan', image: null, kind: 'dxf', pxPerM: 0, hints: [], unitsGuessed: null, scaleFrom: 'typed', scaleCount: 0 };
+
+let welcome = null, sceneReady = Promise.resolve();
 
 const viewer = new Viewer($('view3d'), { onPick: (id, point) => sim.pick(id, point) || selectZone(id) });
 const sim = initSim({ viewer, getSite: () => state.site, setStatus: (m, e) => setStatus(m, e) });
@@ -64,7 +67,7 @@ function loadCanvas(cv, { name, kind, pxPerM = 0, hints = [], textBoxes = [], un
   $('scale-note').textContent = pxPerM > 0 ? note : scaleNote();
   // the width field shows only when the plan gives no scale of its own
   document.body.dataset.planScale = pxPerM > 0 ? 'known' : 'unknown';
-  process();
+  if (!process()) throw new Error($('status').textContent || 'Could not build the plan.');
 }
 
 // Raster plans: 10 cm cells when the image is sharp enough, never coarser than 25 cm.
@@ -211,9 +214,11 @@ function process() {
     if (state.pxPerM) $('p-width').value = ((state.base.wallMask ? wallSpanPx(state.base) : 0) / state.pxPerM).toFixed(1);
     resegment(true);
     setStatus(`Plan read in ${Math.round(performance.now() - t0)} ms`);
+    return true;
   } catch (err) {
     setStatus(err.message, true);
     console.error(err);
+    return false;
   }
 }
 
@@ -244,7 +249,8 @@ function resegment(reframe = false) {
   if (reframe) viewer.setSite(state.site, state.plan, state.dist);
   else keepCamera(() => viewer.setSite(state.site, state.plan, state.dist));
   renderInfo();
-  sim.siteChanged();
+  sceneReady = sim.siteChanged();
+  sceneReady.catch(() => {}); // The import lifecycle reports readiness failures; edits may have no awaiting caller.
 }
 
 // Zone ids are renumbered on every run; carry names and types over to the new zone
@@ -530,17 +536,49 @@ $('file').addEventListener('change', (e) => {
   e.target.value = '';
 });
 function handleFile(f) {
-  const current = beginImport();
-  if (!PLAN_FILE.test(f.name)) {
-    setStatus('Open a plan as DXF, PDF or an image (PNG, JPG).', true);
+  if (!PLAN_FILE.test(f.name) || f.size === 0) {
+    beginImport();
+    const message = f.size === 0 ? 'This file is empty. Choose another plan.' : 'Open a plan as DXF, PDF or an image (PNG, JPG).';
+    welcome?.showError(message);
+    setStatus(message, true);
     return;
   }
   const name = f.name.replace(/\.[^.]+$/, '');
-  const fail = (err) => { if (!current()) return; setStatus(`Could not read ${f.name}: ${err.message}`, true); console.error(err); };
-  const ext = f.name.split('.').pop().toLowerCase();
-  if (ext === 'dxf') f.text().then((t) => loadDxf(t, name, current)).catch(fail);
-  else if (ext === 'pdf') f.arrayBuffer().then((b) => loadPdf(b, name, current)).catch(fail);
-  else loadImage(URL.createObjectURL(f), name, null, [], { current }).catch(fail);
+  return openPlan(async (current) => {
+    const ext = f.name.split('.').pop().toLowerCase();
+    if (ext === 'dxf') await loadDxf(await f.text(), name, current);
+    else if (ext === 'pdf') await loadPdf(await f.arrayBuffer(), name, current);
+    else {
+      const url = URL.createObjectURL(f);
+      try { await loadImage(url, name, null, [], { current }); }
+      finally { URL.revokeObjectURL(url); }
+    }
+  }, f.name);
+}
+
+async function openPlan(load, name) {
+  const current = beginImport();
+  welcome?.showLoading(name);
+  try {
+    // Paint the loading screen before synchronous DXF parsing and model construction.
+    await new Promise(resolve => {
+      if (document.visibilityState === 'hidden') setTimeout(resolve, 0);
+      else requestAnimationFrame(() => setTimeout(resolve, 0));
+    });
+    if (!current()) return;
+    await load(current);
+    if (!current()) return;
+    if (!state.site?.zones?.length || viewer.site !== state.site) throw new Error('No usable rooms were found. Check the plan and try again.');
+    await sceneReady;
+    if (!current()) return;
+    welcome?.showWorkspace();
+    viewer._resize();
+  } catch (err) {
+    if (!current()) return;
+    welcome?.showError(err.message);
+    setStatus(`Could not load ${name}: ${err.message}`, true);
+    console.error(err);
+  }
 }
 const drop = $('main');
 drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('drag'); });
@@ -555,12 +593,11 @@ drop.addEventListener('drop', (e) => {
 async function loadSample(kind) {
   const s = SAMPLES[kind];
   if (!s) return;
-  const current = beginImport();
-  try {
+  return openPlan(async (current) => {
     if (kind === 'dxf') await loadDxf(await (await fetch(s.url)).text(), 'Sample factory', current);
     if (kind === 'pdf') await loadPdf(await (await fetch(s.url)).arrayBuffer(), 'Sample factory', current);
     if (kind === 'png') await loadImage(s.url, 'Sample factory', s.widthM, s.hints, { current });
-  } catch (err) { if (!current()) return; setStatus(`Could not load the sample: ${err.message}`, true); console.error(err); }
+  }, 'Sample factory');
 }
 $('sample').addEventListener('change', (e) => loadSample(e.target.value));
 for (const id of ['p-width', 'p-cell', 'p-door', 'p-filter']) {
@@ -607,4 +644,4 @@ document.body.dataset.mode ||= 'orbit';
 
 // expose for debugging and tests
 window.optesc = { state, sim, calibrate, viewer, editor, loadDxf, loadPdf, loadImage, loadSample, siteToIfc };
-loadSample('dxf');
+welcome = initWelcome({ onFile: handleFile, onSample: () => loadSample('dxf') });
